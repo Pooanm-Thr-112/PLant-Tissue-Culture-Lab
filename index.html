@@ -1,0 +1,2340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Virtual Plant Tissue Culture Laboratory</title>
+<style>
+:root{
+  --bg-deep:#0b1420;
+  --bg-panel:#101d2b;
+  --bg-panel-2:#152537;
+  --line:#22394f;
+  --ink:#e7eef5;
+  --ink-dim:#8fa6bb;
+  --accent:#2fd4c0;
+  --accent-dim:#1a8f81;
+  --amber:#f5a623;
+  --red:#e5484d;
+  --font-ui:'Segoe UI',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:'Consolas','SFMono-Regular',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-deep);font-family:var(--font-ui);color:var(--ink);}
+#canvas-holder{position:fixed;inset:0;}
+canvas{display:block;outline:none;}
+
+/* ===================== LANDING SCREEN ===================== */
+#landing{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(47,212,192,0.10), transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(47,212,192,0.06), transparent 50%),
+    linear-gradient(180deg,#0a1119 0%,#0b1420 55%,#0d1826 100%);
+  transition:opacity .9s ease, visibility .9s ease;
+}
+#landing.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.landing-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(47,212,192,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47,212,192,0.05) 1px, transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse at center, black 0%, transparent 75%);
+}
+.landing-content{position:relative;text-align:center;max-width:760px;padding:0 28px;}
+.landing-kicker{
+  font-family:var(--font-mono);font-size:12px;letter-spacing:3px;color:var(--accent);
+  margin-bottom:22px;opacity:.85;
+}
+.landing-title{
+  font-size:clamp(30px,5.2vw,54px);font-weight:600;line-height:1.15;letter-spacing:-0.5px;
+  color:var(--ink);margin-bottom:16px;
+}
+.landing-title span{color:var(--accent);}
+.landing-sub{
+  font-size:clamp(15px,2vw,19px);color:var(--ink-dim);font-weight:400;margin-bottom:8px;
+}
+.landing-tag{font-size:13px;color:#5c7488;margin-bottom:46px;}
+.landing-buttons{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.lbtn{
+  font-family:var(--font-ui);font-size:14.5px;font-weight:600;letter-spacing:.3px;
+  padding:15px 30px;border-radius:3px;cursor:pointer;border:1px solid var(--line);
+  background:var(--bg-panel);color:var(--ink);transition:all .2s ease;
+}
+.lbtn:hover{border-color:var(--accent);background:var(--bg-panel-2);transform:translateY(-1px);}
+.lbtn.primary{background:var(--accent);color:#06201b;border-color:var(--accent);}
+.lbtn.primary:hover{background:#3fe6d1;}
+.landing-diagram{
+  position:absolute;bottom:34px;left:0;right:0;display:flex;justify-content:center;gap:28px;
+  font-family:var(--font-mono);font-size:11px;color:#4d6579;letter-spacing:1px;
+}
+.landing-diagram span{padding:6px 12px;border:1px solid var(--line);border-radius:2px;}
+
+/* ===================== LOADING ===================== */
+#loading{
+  position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;
+  background:var(--bg-deep);flex-direction:column;gap:16px;transition:opacity .5s ease;
+}
+#loading.hidden{opacity:0;pointer-events:none;}
+.spinner{width:42px;height:42px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading-text{font-family:var(--font-mono);font-size:12px;color:var(--ink-dim);letter-spacing:1px;}
+
+/* ===================== TOP BAR ===================== */
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;pointer-events:none;
+  background:linear-gradient(180deg, rgba(8,14,22,0.85), transparent);
+}
+#topbar.hidden{display:none;}
+.topbar-left{pointer-events:auto;}
+.brand{font-size:14px;font-weight:700;letter-spacing:1.5px;color:var(--ink);}
+.brand small{display:block;font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--accent);letter-spacing:1.5px;margin-top:2px;}
+.topbar-right{display:flex;gap:8px;pointer-events:auto;flex-wrap:wrap;justify-content:flex-end;}
+.tbtn{
+  font-family:var(--font-ui);font-size:12px;font-weight:600;letter-spacing:.3px;
+  padding:9px 14px;border-radius:3px;cursor:pointer;border:1px solid var(--line);
+  background:rgba(16,29,43,0.9);color:var(--ink-dim);transition:all .18s ease;backdrop-filter:blur(6px);
+  white-space:nowrap;
+}
+.tbtn:hover{color:var(--ink);border-color:var(--accent);}
+.tbtn.active{background:var(--accent);color:#06201b;border-color:var(--accent);}
+
+/* ===================== BOTTOM BAR ===================== */
+#bottombar{
+  position:fixed;bottom:16px;left:0;right:0;z-index:20;text-align:center;pointer-events:none;
+}
+#bottombar span{
+  font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);letter-spacing:.5px;
+  background:rgba(11,20,32,0.75);padding:7px 16px;border-radius:20px;border:1px solid var(--line);
+  backdrop-filter:blur(6px);
+}
+#bottombar.hidden{display:none;}
+
+/* ===================== CROSSHAIR (first person) ===================== */
+#crosshair{
+  position:fixed;top:50%;left:50%;width:6px;height:6px;margin:-3px 0 0 -3px;
+  border-radius:50%;background:rgba(255,255,255,0.7);z-index:19;display:none;
+  box-shadow:0 0 0 1px rgba(0,0,0,0.4);
+}
+#fp-hint{
+  position:fixed;bottom:70px;left:0;right:0;text-align:center;z-index:19;display:none;
+  font-family:var(--font-mono);font-size:12px;color:var(--ink-dim);
+}
+
+/* ===================== INFO PANEL ===================== */
+#info-panel{
+  position:fixed;top:0;right:0;bottom:0;width:380px;max-width:92vw;z-index:30;
+  background:rgba(13,22,33,0.97);border-left:1px solid var(--line);
+  transform:translateX(100%);transition:transform .35s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;backdrop-filter:blur(10px);
+}
+#info-panel.open{transform:translateX(0);}
+.ip-header{padding:20px 22px 14px;border-bottom:1px solid var(--line);position:relative;}
+.ip-eyebrow{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);letter-spacing:2px;margin-bottom:8px;}
+.ip-title{font-size:20px;font-weight:700;line-height:1.25;padding-right:30px;}
+.ip-close{
+  position:absolute;top:18px;right:18px;width:28px;height:28px;border-radius:50%;
+  background:var(--bg-panel-2);border:1px solid var(--line);color:var(--ink-dim);
+  cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;
+}
+.ip-close:hover{color:var(--ink);border-color:var(--accent);}
+.ip-tabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;}
+.ip-tab{
+  flex:1;padding:11px 6px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.4px;
+  color:var(--ink-dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+}
+.ip-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.ip-body{flex:1;overflow-y:auto;padding:20px 22px;font-size:13.5px;line-height:1.65;color:#c3d2df;}
+.ip-body::-webkit-scrollbar{width:6px;}
+.ip-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+.ip-section{display:none;}
+.ip-section.active{display:block;animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.ip-list{list-style:none;margin-top:6px;}
+.ip-list li{padding:5px 0 5px 16px;position:relative;}
+.ip-list li::before{content:'—';position:absolute;left:0;color:var(--accent-dim);}
+.ip-badge{
+  display:inline-block;font-family:var(--font-mono);font-size:10px;letter-spacing:1px;
+  padding:3px 8px;border-radius:2px;background:rgba(47,212,192,0.12);color:var(--accent);
+  border:1px solid rgba(47,212,192,0.3);margin-bottom:4px;
+}
+
+/* ===================== TOOLTIP ===================== */
+#tooltip{
+  position:fixed;z-index:25;pointer-events:none;
+  background:rgba(13,22,33,0.95);border:1px solid var(--accent);color:var(--ink);
+  font-size:11.5px;font-family:var(--font-mono);padding:6px 10px;border-radius:3px;
+  display:none;transform:translate(14px,14px);letter-spacing:.3px;
+}
+
+/* ===================== TOUR PANEL ===================== */
+#tour-panel{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(140%);z-index:30;
+  width:min(560px,92vw);background:rgba(13,22,33,0.97);border:1px solid var(--line);
+  border-radius:6px;padding:18px 22px;transition:transform .4s cubic-bezier(.2,.8,.2,1);
+  backdrop-filter:blur(10px);
+}
+#tour-panel.open{transform:translateX(-50%) translateY(0);}
+.tour-step{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);letter-spacing:2px;margin-bottom:6px;}
+.tour-title{font-size:17px;font-weight:700;margin-bottom:8px;}
+.tour-desc{font-size:13px;color:var(--ink-dim);line-height:1.6;margin-bottom:16px;}
+.tour-controls{display:flex;gap:8px;align-items:center;justify-content:space-between;}
+.tour-nav{display:flex;gap:8px;}
+.tour-progress{display:flex;gap:4px;}
+.tour-dot{width:5px;height:5px;border-radius:50%;background:var(--line);}
+.tour-dot.active{background:var(--accent);width:14px;border-radius:3px;}
+
+/* ===================== SAFETY CHECKLIST ===================== */
+#safety-panel{
+  position:fixed;top:74px;left:20px;z-index:30;width:300px;max-width:85vw;
+  background:rgba(13,22,33,0.97);border:1px solid var(--amber);border-radius:6px;
+  padding:18px 20px;transform:translateX(-120%);transition:transform .35s ease;backdrop-filter:blur(10px);
+}
+#safety-panel.open{transform:translateX(0);}
+.sp-title{font-size:14px;font-weight:700;color:var(--amber);letter-spacing:.5px;margin-bottom:4px;}
+.sp-sub{font-size:11px;color:var(--ink-dim);margin-bottom:14px;}
+.sp-item{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,0.05);}
+.sp-check{width:15px;height:15px;border-radius:3px;background:var(--amber);flex:0 0 15px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#241701;}
+
+/* ===================== WORKFLOW PANEL ===================== */
+#workflow-overlay{
+  position:fixed;inset:0;z-index:40;background:rgba(6,11,17,0.88);
+  display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;
+  transition:opacity .3s ease, visibility .3s ease;padding:20px;
+}
+#workflow-overlay.open{opacity:1;visibility:visible;}
+#workflow-box{
+  width:min(720px,94vw);max-height:86vh;overflow-y:auto;background:var(--bg-panel);
+  border:1px solid var(--line);border-radius:8px;padding:30px 30px 22px;
+}
+.wf-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
+.wf-title{font-size:20px;font-weight:700;}
+.wf-sub{font-size:12.5px;color:var(--ink-dim);margin-top:6px;}
+.wf-close{
+  width:30px;height:30px;border-radius:50%;background:var(--bg-panel-2);border:1px solid var(--line);
+  color:var(--ink-dim);cursor:pointer;font-size:16px;flex:0 0 30px;
+}
+.wf-step{
+  display:flex;gap:16px;align-items:flex-start;padding:14px 14px;border-radius:5px;cursor:pointer;
+  border:1px solid transparent;transition:all .15s ease;
+}
+.wf-step:hover{background:var(--bg-panel-2);border-color:var(--line);}
+.wf-num{
+  font-family:var(--font-mono);font-size:12px;color:var(--accent);border:1px solid var(--accent-dim);
+  width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 30px;
+}
+.wf-step-title{font-size:14.5px;font-weight:700;margin-bottom:3px;}
+.wf-step-desc{font-size:12.5px;color:var(--ink-dim);line-height:1.55;}
+.wf-arrow{text-align:center;color:var(--line);font-size:14px;padding:1px 0;}
+
+/* ===================== MOBILE TOUCH CONTROLS ===================== */
+#touch-controls{position:fixed;bottom:24px;left:24px;z-index:22;display:none;}
+.touch-pad{
+  display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px;
+}
+.touch-btn{
+  background:rgba(16,29,43,0.85);border:1px solid var(--line);border-radius:6px;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;font-size:16px;user-select:none;
+}
+
+/* ===================== FIRST TIME HINT ===================== */
+.hidden{display:none!important;}
+@media (max-width:720px){
+  .topbar-right{max-width:60vw;}
+  .tbtn{padding:8px 10px;font-size:11px;}
+  #info-panel{width:100vw;}
+  .brand small{display:none;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="loading-text">INITIALIZING LABORATORY ENVIRONMENT…</div>
+</div>
+
+<div id="landing" class="hidden">
+  <div class="landing-grid"></div>
+  <div class="landing-content">
+    <div class="landing-kicker">EDUCATIONAL LABORATORY VISUALIZATION</div>
+    <h1 class="landing-title">VIRTUAL PLANT<br>TISSUE CULTURE <span>LABORATORY</span></h1>
+    <p class="landing-sub">Interactive 3D Laboratory Simulation</p>
+    <p class="landing-tag">Explore media preparation, sterilization, aseptic transfer, culture incubation and laboratory safety systems.</p>
+    <div class="landing-buttons">
+      <button class="lbtn primary" id="btn-enter-lab">ENTER LAB</button>
+      <button class="lbtn" id="btn-guided-tour-land">GUIDED TOUR</button>
+      <button class="lbtn" id="btn-lab-safety-land">LAB SAFETY</button>
+    </div>
+  </div>
+  <div class="landing-diagram">
+    <span>MEDIA PREP</span><span>STERILIZATION</span><span>ASEPTIC TRANSFER</span><span>INCUBATION</span>
+  </div>
+</div>
+
+<div id="canvas-holder"></div>
+<div id="crosshair"></div>
+<div id="fp-hint">W A S D to move · Mouse to look · ESC to exit first-person mode</div>
+
+<div id="topbar" class="hidden">
+  <div class="topbar-left">
+    <div class="brand">VIRTUAL PLANT TISSUE CULTURE LAB
+      <small>3D INTERACTIVE SIMULATION</small>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="tbtn" id="btn-tour">Guided Tour</button>
+    <button class="tbtn" id="btn-safety">Safety Mode</button>
+    <button class="tbtn" id="btn-workflow">Workflow</button>
+    <button class="tbtn" id="btn-fp">First-Person</button>
+    <button class="tbtn" id="btn-reset">Reset View</button>
+  </div>
+</div>
+
+<div id="bottombar" class="hidden"><span>Click equipment to inspect · Drag to rotate · Scroll to zoom</span></div>
+
+<div id="tooltip">Click to inspect</div>
+
+<div id="info-panel">
+  <div class="ip-header">
+    <div class="ip-eyebrow" id="ip-zone">ZONE</div>
+    <div class="ip-title" id="ip-title">Equipment Name</div>
+    <button class="ip-close" id="ip-close">✕</button>
+  </div>
+  <div class="ip-tabs">
+    <div class="ip-tab active" data-tab="overview">OVERVIEW</div>
+    <div class="ip-tab" data-tab="principle">PRINCIPLE</div>
+    <div class="ip-tab" data-tab="function">FUNCTION</div>
+    <div class="ip-tab" data-tab="safety">SAFETY</div>
+    <div class="ip-tab" data-tab="role">ROLE</div>
+  </div>
+  <div class="ip-body">
+    <div class="ip-section active" data-tab="overview" id="ip-overview"></div>
+    <div class="ip-section" data-tab="principle" id="ip-principle"></div>
+    <div class="ip-section" data-tab="function" id="ip-function"></div>
+    <div class="ip-section" data-tab="safety" id="ip-safety"></div>
+    <div class="ip-section" data-tab="role" id="ip-role"></div>
+  </div>
+</div>
+
+<div id="tour-panel">
+  <div class="tour-step" id="tour-step-label">STOP 1 OF 12</div>
+  <div class="tour-title" id="tour-title"></div>
+  <div class="tour-desc" id="tour-desc"></div>
+  <div class="tour-controls">
+    <div class="tour-progress" id="tour-progress"></div>
+    <div class="tour-nav">
+      <button class="tbtn" id="tour-prev">PREVIOUS</button>
+      <button class="tbtn" id="tour-next">NEXT</button>
+      <button class="tbtn" id="tour-exit">EXIT TOUR</button>
+    </div>
+  </div>
+</div>
+
+<div id="safety-panel">
+  <div class="sp-title">SAFETY MODE ACTIVE</div>
+  <div class="sp-sub">Critical safety infrastructure highlighted in the scene.</div>
+  <div id="safety-checklist"></div>
+</div>
+
+<div id="workflow-overlay">
+  <div id="workflow-box">
+    <div class="wf-header">
+      <div>
+        <div class="wf-title">TISSUE CULTURE PROCESS</div>
+        <div class="wf-sub">Select a stage to move to its laboratory zone.</div>
+      </div>
+      <button class="wf-close" id="wf-close">✕</button>
+    </div>
+    <div id="wf-steps"></div>
+  </div>
+</div>
+
+<div id="touch-controls">
+  <div class="touch-pad">
+    <div></div><div class="touch-btn" data-k="w">▲</div><div></div>
+    <div class="touch-btn" data-k="a">◀</div><div></div><div class="touch-btn" data-k="d">▶</div>
+    <div></div><div class="touch-btn" data-k="s">▼</div><div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* =========================================================================================
+   VIRTUAL PLANT TISSUE CULTURE LABORATORY — main.js (inlined)
+   ========================================================================================= */
+
+let scene, camera, renderer, orbit;
+let raycaster, mouse;
+let interactiveObjects = [];
+let safetyObjects = [];
+let hovered = null;
+let clock = new THREE.Clock();
+let obstacles = []; // {min:Vector2, max:Vector2} for simple collision in first person
+
+const ROOM = { w: 46, d: 30, h: 6.4 };
+
+/* ---------------------------------------------------------------------------------------
+   MATERIAL LIBRARY
+--------------------------------------------------------------------------------------- */
+const MAT = {
+  steel: new THREE.MeshStandardMaterial({ color: 0xb9c2c9, metalness: 0.9, roughness: 0.28 }),
+  steelDark: new THREE.MeshStandardMaterial({ color: 0x6c7680, metalness: 0.85, roughness: 0.35 }),
+  benchTop: new THREE.MeshStandardMaterial({ color: 0xd7dadd, metalness: 0.4, roughness: 0.25 }),
+  floor: new THREE.MeshStandardMaterial({ color: 0xdfe4e6, metalness: 0.05, roughness: 0.55 }),
+  floorAccent: new THREE.MeshStandardMaterial({ color: 0xc7d6da, metalness: 0.05, roughness: 0.6 }),
+  wall: new THREE.MeshStandardMaterial({ color: 0xf5f7fa, roughness: 0.9, metalness: 0.04 }),
+  wallDark: new THREE.MeshStandardMaterial({ color: 0xe0e8ec, roughness: 0.88, metalness: 0.04 }),
+  ceiling: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.92, metalness: 0.02 }),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xbfe9ea, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0, transmission: 0.6, clearcoat: 1 }),
+  glassAmber: new THREE.MeshPhysicalMaterial({ color: 0x8c7a3c, transparent: true, opacity: 0.55, roughness: 0.1 }),
+  plastic: new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5, metalness: 0.1 }),
+  plasticWhite: new THREE.MeshStandardMaterial({ color: 0xf0f2f3, roughness: 0.4 }),
+  rubber: new THREE.MeshStandardMaterial({ color: 0x22262b, roughness: 0.9 }),
+  cabinet: new THREE.MeshStandardMaterial({ color: 0xe8ebec, roughness: 0.55, metalness: 0.05 }),
+  cabinetDark: new THREE.MeshStandardMaterial({ color: 0x3b4a56, roughness: 0.5, metalness: 0.15 }),
+  media: new THREE.MeshPhysicalMaterial({ color: 0xd9e88a, transparent: true, opacity: 0.85, roughness: 0.15, transmission: 0.3 }),
+  plantGreen: new THREE.MeshStandardMaterial({ color: 0x4c9a4c, roughness: 0.6 }),
+  plantGreen2: new THREE.MeshStandardMaterial({ color: 0x6cb85e, roughness: 0.6 }),
+  screen: new THREE.MeshStandardMaterial({ color: 0x0d2f2a, emissive: 0x1fdfc4, emissiveIntensity: 0.7, roughness: 0.3 }),
+  screenRed: new THREE.MeshStandardMaterial({ color: 0x3a0d0d, emissive: 0xff5a4d, emissiveIntensity: 0.6, roughness: 0.3 }),
+  led: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1 }),
+  ledGreen: new THREE.MeshStandardMaterial({ color: 0x2fd45c, emissive: 0x2fd45c, emissiveIntensity: 1 }),
+  ledRed: new THREE.MeshStandardMaterial({ color: 0xe5484d, emissive: 0xe5484d, emissiveIntensity: 1 }),
+  ledAmber: new THREE.MeshStandardMaterial({ color: 0xf5a623, emissive: 0xf5a623, emissiveIntensity: 1 }),
+  sign: new THREE.MeshStandardMaterial({ color: 0x1f6f4a, roughness: 0.7 }),
+  signRed: new THREE.MeshStandardMaterial({ color: 0xb3282d, roughness: 0.6 }),
+  wood: new THREE.MeshStandardMaterial({ color: 0x9c7b52, roughness: 0.7 }),
+  bottleBlue: new THREE.MeshPhysicalMaterial({ color: 0x2f6fa8, transparent: true, opacity: 0.75, roughness: 0.1, transmission: 0.4 }),
+  bottleClear: new THREE.MeshPhysicalMaterial({ color: 0xdfeff0, transparent: true, opacity: 0.35, roughness: 0.05, transmission: 0.7 }),
+  fridgeBody: new THREE.MeshStandardMaterial({ color: 0xeef1f2, roughness: 0.4, metalness: 0.2 }),
+};
+
+/* ---------------------------------------------------------------------------------------
+   HELPERS
+--------------------------------------------------------------------------------------- */
+function grp(x=0,y=0,z=0,ry=0){ const g = new THREE.Group(); g.position.set(x,y,z); g.rotation.y=ry; return g; }
+function box(w,h,d,mat){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); m.castShadow=true; m.receiveShadow=true; return m; }
+function cyl(r1,r2,h,mat,seg=20){ const m = new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg), mat); m.castShadow=true; m.receiveShadow=true; return m; }
+function addAt(parent,mesh,x,y,z,ry=0){ mesh.position.set(x,y,z); if(ry) mesh.rotation.y=ry; parent.add(mesh); return mesh; }
+function registerObstacle(g, cx, cz, hw, hd){
+  obstacles.push({minx:cx-hw, maxx:cx+hw, minz:cz-hd, maxz:cz+hd});
+}
+function registerInteractive(object3d, data, isSafety=false){
+  object3d.traverse(o=>{ if(o.isMesh){ o.userData.rootId = data.id; } });
+  object3d.userData = Object.assign(object3d.userData||{}, data, {isInteractive:true});
+  interactiveObjects.push(object3d);
+  if(isSafety) safetyObjects.push(object3d);
+  return object3d;
+}
+function makeLabel(text, w=1.6, h=0.4, bg='#123', fg='#fff', fontSize=44){
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,512,128);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth=4; ctx.strokeRect(2,2,508,124);
+  ctx.fillStyle = fg; ctx.font = `700 ${fontSize}px Segoe UI, Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent:true });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
+  return mesh;
+}
+function makeSign(text, sub, w=1.4, h=0.9, color='#1f6f4a'){
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color; ctx.fillRect(0,0,512,320);
+  ctx.fillStyle = '#fff'; ctx.font='700 40px Segoe UI, Arial'; ctx.textAlign='center';
+  wrapText(ctx, text, 256, 130, 460, 46);
+  if(sub){ ctx.font='400 24px Segoe UI, Arial'; ctx.fillText(sub,256,250); }
+  const tex = new THREE.CanvasTexture(canvas);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshStandardMaterial({map:tex, roughness:0.6}));
+  return mesh;
+}
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){
+  const words = text.split(' '); let line=''; let ly=y; const lines=[];
+  for(let n=0;n<words.length;n++){
+    const test = line + words[n] + ' ';
+    if(ctx.measureText(test).width > maxWidth && n>0){ lines.push(line); line = words[n]+' '; } else { line = test; }
+  }
+  lines.push(line);
+  const startY = y - (lines.length-1)*lineHeight/2;
+  lines.forEach((l,i)=> ctx.fillText(l.trim(), x, startY + i*lineHeight));
+}
+
+/* ---------------------------------------------------------------------------------------
+   INIT
+--------------------------------------------------------------------------------------- */
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xcfd8dc);
+  scene.fog = new THREE.Fog(0xcfd8dc, 26, 62);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+  camera.position.set(0, 7.5, 17);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.getElementById('canvas-holder').appendChild(renderer.domElement);
+
+  orbit = new THREE.OrbitControls(camera, renderer.domElement);
+  orbit.enableDamping = true;
+  orbit.dampingFactor = 0.08;
+  orbit.maxPolarAngle = Math.PI*0.49;
+  orbit.minDistance = 2;
+  orbit.maxDistance = 40;
+  orbit.target.set(0,2,0);
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  buildLighting();
+  buildRoom();
+  buildZone_PPE();
+  buildZone_MediaPrep();
+  buildZone_Sterilization();
+  buildZone_LAF();
+  buildZone_CultureRoom();
+  buildZone_Observation();
+  buildZone_ColdStorage();
+  buildZone_DarkStorage();
+  buildZone_Waste();
+  buildSafetyEquipment();
+  buildZoneSignage();
+
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('mousemove', onPointerMove);
+  renderer.domElement.addEventListener('touchmove', onTouchMove, {passive:true});
+  renderer.domElement.addEventListener('click', onClick);
+
+  animate();
+}
+
+/* ---------------------------------------------------------------------------------------
+   LIGHTING
+--------------------------------------------------------------------------------------- */
+let dayNight = 1;
+let sunLight, hemi;
+function buildLighting(){
+  hemi = new THREE.HemisphereLight(0xf4f8fb, 0x8b98a0, 0.65);
+  scene.add(hemi);
+
+  sunLight = new THREE.DirectionalLight(0xfff6e6, 0.55);
+  sunLight.position.set(-14, 18, 10);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048,2048);
+  sunLight.shadow.camera.left = -26; sunLight.shadow.camera.right = 26;
+  sunLight.shadow.camera.top = 20; sunLight.shadow.camera.bottom = -20;
+  sunLight.shadow.camera.far = 60;
+  sunLight.shadow.bias = -0.0015;
+  scene.add(sunLight);
+
+  // ceiling LED panels
+  const positions = [
+    [-14,-8],[-14,0],[-14,8],
+    [-2,-8],[-2,0],[-2,8],
+    [10,-8],[10,0],[10,8],
+    [18,-8],[18,0],[18,8],
+  ];
+  positions.forEach(([x,z])=>{
+    const panel = box(2.6,0.08,1.2, MAT.plasticWhite);
+    panel.position.set(x, ROOM.h-0.1, z);
+    scene.add(panel);
+    const light = new THREE.RectAreaLight ? null : null;
+    const pl = new THREE.PointLight(0xffffff, 0.55, 9, 2);
+    pl.position.set(x, ROOM.h-0.4, z);
+    scene.add(pl);
+    const bulb = new THREE.Mesh(new THREE.PlaneGeometry(2.2,0.9), new THREE.MeshBasicMaterial({color:0xffffff}));
+    bulb.rotation.x = Math.PI/2;
+    bulb.position.set(x, ROOM.h-0.15, z);
+    scene.add(bulb);
+  });
+}
+
+/* ---------------------------------------------------------------------------------------
+   ROOM SHELL
+--------------------------------------------------------------------------------------- */
+function buildRoom(){
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), MAT.floor);
+  floor.rotation.x = -Math.PI/2; floor.receiveShadow = true;
+  scene.add(floor);
+
+  // floor accent strip grid lines (zone division)
+  const gridHelper = new THREE.GridHelper(ROOM.w, 46, 0xb9c4c8, 0xd8e0e2);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), MAT.ceiling);
+  ceiling.rotation.x = Math.PI/2; ceiling.position.y = ROOM.h; ceiling.receiveShadow = true;
+  scene.add(ceiling);
+
+  const wallMat = MAT.wall;
+  // back wall (north, -z)
+  const backWall = box(ROOM.w, ROOM.h, 0.3, wallMat);
+  backWall.position.set(0, ROOM.h/2, -ROOM.d/2);
+  scene.add(backWall);
+  // front wall (south, +z) with entry gap
+  const frontWallL = box(ROOM.w/2-2, ROOM.h, 0.3, wallMat);
+  frontWallL.position.set(-ROOM.w/4-1, ROOM.h/2, ROOM.d/2);
+  scene.add(frontWallL);
+  const frontWallR = box(ROOM.w/2-2, ROOM.h, 0.3, wallMat);
+  frontWallR.position.set(ROOM.w/4+1, ROOM.h/2, ROOM.d/2);
+  scene.add(frontWallR);
+  const doorHeader = box(4, 1.2, 0.3, wallMat);
+  doorHeader.position.set(0, ROOM.h-0.6, ROOM.d/2);
+  scene.add(doorHeader);
+  // door
+  const door = box(1.7, 3.6, 0.12, new THREE.MeshStandardMaterial({color:0x3c5a6e, roughness:0.4, metalness:0.2}));
+  door.position.set(-1.1, 1.8, ROOM.d/2-0.05);
+  scene.add(door);
+  const door2 = box(1.7, 3.6, 0.12, new THREE.MeshStandardMaterial({color:0x3c5a6e, roughness:0.4, metalness:0.2}));
+  door2.position.set(1.1, 1.8, ROOM.d/2-0.05);
+  scene.add(door2);
+
+  // side walls
+  const leftWall = box(0.3, ROOM.h, ROOM.d, wallMat);
+  leftWall.position.set(-ROOM.w/2, ROOM.h/2, 0);
+  scene.add(leftWall);
+  const rightWall = box(0.3, ROOM.h, ROOM.d, wallMat);
+  rightWall.position.set(ROOM.w/2, ROOM.h/2, 0);
+  scene.add(rightWall);
+
+  // windows on left wall
+  for(let i=0;i<3;i++){
+    const win = box(0.06, 2.0, 3.0, MAT.glass);
+    win.position.set(-ROOM.w/2+0.1, 3.4, -9 + i*8);
+    scene.add(win);
+    const frame = box(0.12, 2.2, 3.2, MAT.steelDark);
+    frame.position.set(-ROOM.w/2+0.05, 3.4, -9 + i*8);
+    scene.add(frame);
+  }
+
+  registerObstacle(null, 0, -ROOM.d/2, ROOM.w/2, 0.3);
+  registerObstacle(null, -11.5, ROOM.d/2, 20.9, 0.3);
+  registerObstacle(null, 11.5, ROOM.d/2, 20.9, 0.3);
+  registerObstacle(null, -ROOM.w/2, 0, 0.3, ROOM.d/2);
+  registerObstacle(null, ROOM.w/2, 0, 0.3, ROOM.d/2);
+}
+
+function buildZoneSignage(){
+  const zones = [
+    {t:'ZONE 1 · PPE & ENTRY', x:-19, z:11},
+    {t:'ZONE 2 · MEDIA PREPARATION', x:-12, z:2},
+    {t:'ZONE 3 · STERILIZATION', x:-2, z:2},
+    {t:'ZONE 4 · ASEPTIC TRANSFER', x:8, z:2},
+    {t:'ZONE 5 · CULTURE ROOM', x:19, z:5},
+    {t:'ZONE 6 · OBSERVATION', x:19, z:-9},
+    {t:'ZONE 7 · COLD STORAGE', x:2, z:-11},
+    {t:'ZONE 8 · WASTE MANAGEMENT', x:-12, z:-11},
+    {t:'ZONE 9 · DARK ROOM / STORAGE', x:17, z:-20},
+  ];
+  zones.forEach(z=>{
+    const lbl = makeLabel(z.t, 3.2, 0.5, '#0e2330', '#4fe0c9', 32);
+    lbl.position.set(z.x, ROOM.h-0.62, z.z);
+    lbl.rotation.x = Math.PI/2;
+    scene.add(lbl);
+  });
+}
+
+/* ---------------------------------------------------------------------------------------
+   GENERIC LAB BENCH
+--------------------------------------------------------------------------------------- */
+function makeBench(w,d){
+  const g = new THREE.Group();
+  const top = box(w,0.08,d, MAT.benchTop);
+  top.position.y = 0.92;
+  g.add(top);
+  const legPositions = [[-w/2+0.15,-d/2+0.15],[w/2-0.15,-d/2+0.15],[-w/2+0.15,d/2-0.15],[w/2-0.15,d/2-0.15]];
+  legPositions.forEach(([x,z])=>{
+    const leg = box(0.08,0.9,0.08, MAT.steelDark);
+    leg.position.set(x,0.46,z);
+    g.add(leg);
+  });
+  const cabinetBody = box(w-0.1,0.85,d-0.1, MAT.cabinet);
+  cabinetBody.position.y = 0.46;
+  g.add(cabinetBody);
+  // cabinet doors detail
+  for(let i=-1;i<=1;i+=2){
+    const handle = box(0.02,0.14,0.02, MAT.steelDark);
+    handle.position.set(i*w/5, 0.46, d/2-0.02);
+    g.add(handle);
+  }
+  return g;
+}
+function makeGlassBottle(r,h,color){
+  const g = new THREE.Group();
+  const body = cyl(r,r*0.95,h, color || MAT.bottleClear, 16);
+  body.position.y = h/2;
+  g.add(body);
+  const neck = cyl(r*0.35,r*0.35,h*0.22, color || MAT.bottleClear, 12);
+  neck.position.y = h + h*0.11;
+  g.add(neck);
+  const cap = cyl(r*0.4,r*0.4,0.05, MAT.plastic, 12);
+  cap.position.y = h + h*0.22 + 0.025;
+  g.add(cap);
+  return g;
+}
+function makeBeaker(r,h){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.85,h,20,1,true), MAT.glass);
+  body.position.y = h/2;
+  g.add(body);
+  const liquid = cyl(r*0.9,r*0.78,h*0.35, MAT.media, 20);
+  liquid.position.y = h*0.2;
+  g.add(liquid);
+  return g;
+}
+function makeTestTube(r,h,filled=true){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.9,h,12,1,true), MAT.glass);
+  body.position.y = h/2;
+  g.add(body);
+  if(filled){
+    const media = cyl(r*0.85,r*0.85,h*0.28, MAT.media, 12);
+    media.position.y = h*0.16;
+    g.add(media);
+  }
+  return g;
+}
+function makePetriDish(r){
+  const g = new THREE.Group();
+  const base = cyl(r,r,0.06, MAT.glass, 20);
+  base.position.y = 0.03;
+  g.add(base);
+  const lid = cyl(r*1.03,r*1.03,0.03, MAT.glass, 20);
+  lid.position.y = 0.11;
+  g.add(lid);
+  return g;
+}
+function makeMiniPlant(scale=1){
+  const g = new THREE.Group();
+  const stem = cyl(0.012*scale,0.014*scale,0.09*scale, MAT.plantGreen2, 6);
+  stem.position.y = 0.045*scale;
+  g.add(stem);
+  for(let i=0;i<4;i++){
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.03*scale,8,6), i%2?MAT.plantGreen:MAT.plantGreen2);
+    leaf.scale.set(1,0.35,2);
+    const ang = (i/4)*Math.PI*2;
+    leaf.position.set(Math.cos(ang)*0.03*scale, 0.08*scale + i*0.012, Math.sin(ang)*0.03*scale);
+    leaf.rotation.y = ang;
+    g.add(leaf);
+  }
+  return g;
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 1 — PPE & ENTRY  (x ~ -22..-16, z ~ 6..14)
+--------------------------------------------------------------------------------------- */
+function buildZone_PPE(){
+  const z = grp(-19, 0, 10);
+  scene.add(z);
+
+  // instruction board
+  const board = box(2.0,1.3,0.06, new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.6}));
+  board.position.set(0,1.8,-2.3);
+  z.add(board);
+  const boardText = makeSign('PPE REQUIRED','Coat · Gloves · Mask · Goggles · Shoe Covers',1.8,1.15,'#1f6f4a');
+  boardText.position.set(0,1.8,-2.26);
+  z.add(boardText);
+
+  // coat rack with lab coats
+  const rack = grp(-2.5,0,-1.1);
+  const pole = cyl(0.05,0.05,2.1, MAT.steelDark); pole.position.y=1.05; rack.add(pole);
+  const base = cyl(0.38,0.38,0.06, MAT.steelDark); rack.add(base);
+  const bar = box(1.8,0.05,0.05, MAT.steelDark); bar.position.y=1.9; rack.add(bar);
+  const coatColors = ['#e9edee','#dfe5e8','#f2f5f7'];
+  coatColors.forEach((c,i)=>{
+    const coat = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.95,0.16), new THREE.MeshStandardMaterial({color:c, roughness:0.75}));
+    body.position.set(-0.75 + i*0.75, 1.2, 0);
+    coat.add(body);
+    const sleeveL = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.7,0.14), new THREE.MeshStandardMaterial({color:c, roughness:0.75}));
+    sleeveL.position.set(-1.02 + i*0.75, 1.2, 0.02); sleeveL.rotation.z = 0.35; coat.add(sleeveL);
+    const sleeveR = sleeveL.clone(); sleeveR.position.x = -0.48 + i*0.75; sleeveR.rotation.z = -0.35; coat.add(sleeveR);
+    const collar = box(0.34,0.12,0.09, new THREE.MeshStandardMaterial({color:0xffffff}));
+    collar.position.set(-0.75 + i*0.75, 1.72, 0.01); coat.add(collar);
+    const hook = cyl(0.02,0.02,0.25, MAT.steelDark); hook.position.set(-0.75 + i*0.75, 1.72, 0.06); hook.rotation.z = Math.PI/2; coat.add(hook);
+    rack.add(coat);
+  });
+  registerInteractive(rack, {
+    id:'ppe-coat', zone:'Zone 1 — PPE & Entry', name:'Laboratory Coats',
+    overview:'A dedicated coat rack holding clean laboratory coats issued to every person entering the tissue culture facility.',
+    principle:'A physical barrier layer reduces transfer of skin flora, dust and outside contaminants onto sterile work surfaces and culture material.',
+    func:'Worn over street clothing at all times inside the laboratory to reduce contamination risk and protect the wearer from reagents.',
+    safety:'Must be buttoned, kept clean, and never worn outside the facility. Replace immediately if visibly soiled or torn.',
+    role:'First control point in the contamination-prevention chain, applied before any other laboratory activity begins.'
+  }, true);
+  z.add(rack);
+
+  // gloves + mask + goggles on a small shelf
+  const shelf = grp(-0.2,0,-2.0);
+  const board2 = box(1.8,0.05,0.45, MAT.cabinet); board2.position.y=1.0; shelf.add(board2);
+  const bracket = box(0.06,1.0,0.38, MAT.steelDark); bracket.position.set(-0.82,0.5,0); shelf.add(bracket);
+  const bracket2 = box(0.06,1.0,0.38, MAT.steelDark); bracket2.position.set(0.82,0.5,0); shelf.add(bracket2);
+
+  // glove pair
+  const gloveGroup = new THREE.Group();
+  const gloveMat = new THREE.MeshStandardMaterial({color:0xe8f0f6, roughness:0.55});
+  const gloveShape = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.18,0.12), gloveMat);
+  gloveShape.position.set(-0.18,1.14,0); gloveShape.scale.set(1.2,1.4,1.1); gloveGroup.add(gloveShape);
+  const gloveShape2 = gloveShape.clone(); gloveShape2.position.x = 0.18; gloveGroup.add(gloveShape2);
+  const gloveFingerL = box(0.08,0.18,0.05, gloveMat); gloveFingerL.position.set(-0.28,1.2,0.02); gloveGroup.add(gloveFingerL);
+  const gloveFingerR = gloveFingerL.clone(); gloveFingerR.position.x = 0.28; gloveGroup.add(gloveFingerR);
+  shelf.add(gloveGroup);
+
+  // surgical mask
+  const maskGroup = new THREE.Group();
+  const maskBase = new THREE.Mesh(new THREE.BoxGeometry(0.26,0.14,0.025), new THREE.MeshStandardMaterial({color:0xf5f7f8, roughness:0.6}));
+  maskBase.position.set(0,1.12,0.02); maskGroup.add(maskBase);
+  const maskSeam = box(0.23,0.02,0.012, new THREE.MeshStandardMaterial({color:0xdbe2e6, roughness:0.7}));
+  maskSeam.position.set(0,1.16,0.03); maskGroup.add(maskSeam);
+  const maskStrap1 = box(0.05,0.02,0.01, new THREE.MeshStandardMaterial({color:0xc9d2d7, roughness:0.7}));
+  maskStrap1.position.set(-0.1,1.24,0.02); maskGroup.add(maskStrap1);
+  const maskStrap2 = maskStrap1.clone(); maskStrap2.position.x = 0.1; maskGroup.add(maskStrap2);
+  const maskClip = box(0.02,0.03,0.012, new THREE.MeshStandardMaterial({color:0x8aa0af}));
+  maskClip.position.set(-0.15,1.1,0.04); maskGroup.add(maskClip);
+  const maskClip2 = maskClip.clone(); maskClip2.position.x = 0.15; maskGroup.add(maskClip2);
+  maskGroup.position.x = 0.3; shelf.add(maskGroup);
+
+  // goggles
+  const goggleFrame = new THREE.Group();
+  const gl1 = cyl(0.05,0.05,0.02, new THREE.MeshPhysicalMaterial({color:0x8fd6e0, transparent:true, opacity:0.7}), 16);
+  gl1.rotation.z = Math.PI/2; gl1.position.set(-0.12,1.08,-0.02); goggleFrame.add(gl1);
+  const gl2 = gl1.clone(); gl2.position.x = 0.12; goggleFrame.add(gl2);
+  const glide = box(0.18,0.02,0.035, MAT.rubber); glide.position.set(0,1.08,0); goggleFrame.add(glide);
+  goggleFrame.position.x = 0.78; shelf.add(goggleFrame);
+
+  // shoe covers
+  const shoeCoverGroup = new THREE.Group();
+  const coverLeft = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.08), new THREE.MeshStandardMaterial({color:0xf3f7f8, roughness:0.65}));
+  coverLeft.position.set(-0.12,1.08,-0.08); coverLeft.rotation.z = -0.22; shoeCoverGroup.add(coverLeft);
+  const coverRight = coverLeft.clone(); coverRight.position.x = 0.12; coverRight.position.z = 0.08; coverRight.rotation.z = 0.22; shoeCoverGroup.add(coverRight);
+  const toeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.06,0.09), new THREE.MeshStandardMaterial({color:0xe9eef2, roughness:0.6}));
+  toeLeft.position.set(-0.2,1.12,-0.02); shoeCoverGroup.add(toeLeft);
+  const toeRight = toeLeft.clone(); toeRight.position.x = 0.2; shoeCoverGroup.add(toeRight);
+  shoeCoverGroup.position.x = 1.15; shelf.add(shoeCoverGroup);
+
+  // clear supply boxes
+  const gloveBox = box(0.28,0.12,0.18, new THREE.MeshStandardMaterial({color:0x3a7ec2}));
+  gloveBox.position.set(-0.62,1.08,0); shelf.add(gloveBox);
+  const maskBox = box(0.22,0.1,0.14, new THREE.MeshStandardMaterial({color:0xeaeef0}));
+  maskBox.position.set(0.1,1.07,0); shelf.add(maskBox);
+  const shoeBox = box(0.32,0.14,0.18, new THREE.MeshStandardMaterial({color:0x53728a}));
+  shoeBox.position.set(0.68,1.08,0); shelf.add(shoeBox);
+
+  registerInteractive(shelf, {
+    id:'ppe-shelf', zone:'Zone 1 — PPE & Entry', name:'PPE Dispensing Shelf',
+    overview:'Shelf stocked with disposable nitrile gloves, face masks, safety goggles and shoe covers for every entrant.',
+    principle:'Layered personal protection minimises the introduction of microbial contaminants and protects personnel from chemical splashes.',
+    func:'Provides single-use protective items that are put on before entering media preparation and aseptic work areas.',
+    safety:'Use a fresh set per session. Dispose of used items in general waste unless chemically contaminated.',
+    role:'Supports aseptic technique upstream of every laboratory procedure performed in the facility.'
+  }, true);
+  z.add(shelf);
+
+  // hand sanitization station
+  const sink = grp(1.6,0,-1.6);
+  const sinkBasin = box(0.55,0.35,0.4, MAT.steel); sinkBasin.position.y=0.85; sink.add(sinkBasin);
+  const sinkStand = box(0.5,0.85,0.35, MAT.steelDark); sinkStand.position.y=0.42; sink.add(sinkStand);
+  const tap = new THREE.Group();
+  const tapBase = cyl(0.02,0.02,0.3, MAT.steel); tapBase.position.set(0,1.15,-0.15); tap.add(tapBase);
+  const tapArm = box(0.02,0.02,0.2, MAT.steel); tapArm.position.set(0,1.28,-0.05); tap.add(tapArm);
+  sink.add(tap);
+  const soapDispenser = new THREE.Group();
+  const sBody = cyl(0.045,0.05,0.16, new THREE.MeshStandardMaterial({color:0x357a8a}));
+  sBody.position.set(0.35,1.0,-0.1); soapDispenser.add(sBody);
+  const sPump = cyl(0.012,0.012,0.08, MAT.steelDark); sPump.position.set(0.35,1.12,-0.1); soapDispenser.add(sPump);
+  sink.add(soapDispenser);
+  registerInteractive(sink, {
+    id:'ppe-sink', zone:'Zone 1 — PPE & Entry', name:'Hand-Washing / Sanitization Station',
+    overview:'A wall-mounted basin with soap and alcohol-based hand sanitizer used immediately before donning gloves.',
+    principle:'Mechanical washing combined with an antimicrobial agent reduces transient microbial load on the skin.',
+    func:'Used at entry and whenever hands are re-contaminated during laboratory work.',
+    safety:'Dry hands fully before handling electrical equipment. Report any skin irritation from sanitizer to a supervisor.',
+    role:'Reduces the largest single contamination source in tissue culture work — human hands — before any aseptic task.'
+  }, true);
+  z.add(sink);
+
+  registerObstacle(z, -19, 10, 2.2, 2.6);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 2 — MEDIA PREPARATION (x ~ -16..-8, z ~ -2..6)
+--------------------------------------------------------------------------------------- */
+function buildZone_MediaPrep(){
+  const z = grp(-12, 0, 2);
+  scene.add(z);
+  const bench = makeBench(7.2, 1.6);
+  bench.position.set(0,0,1.4);
+  z.add(bench);
+  registerObstacle(z, -12, 3.4, 3.6, 0.8);
+
+  // analytical balance
+  const balance = new THREE.Group();
+  const bBase = box(0.5,0.06,0.4, MAT.steelDark); bBase.position.y=1.0; balance.add(bBase);
+  const bDraftShield = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.28,0.32), MAT.glass);
+  bDraftShield.position.y=1.17; balance.add(bDraftShield);
+  const bPan = cyl(0.1,0.1,0.015, MAT.steel,16); bPan.position.y=1.035; balance.add(bPan);
+  const bDisplay = box(0.42,0.09,0.02, MAT.screen); bDisplay.position.set(0,0.98,0.22); balance.add(bDisplay);
+  const bButtons = box(0.4,0.02,0.08, MAT.plastic); bButtons.position.set(0,0.935,0.22); balance.add(bButtons);
+  balance.position.set(-3.0,0,0.9);
+  registerInteractive(balance, {
+    id:'balance', zone:'Zone 2 — Media Preparation', name:'Analytical Balance',
+    overview:'A precision electronic balance used to weigh macro- and micro-nutrients, sugars and gelling agents for culture media.',
+    principle:'Electronic measurement of mass using a precision load-cell weighing mechanism, shielded from air currents by a draft screen.',
+    func:'Accurate weighing of media components before dissolution and volume adjustment.',
+    safety:'Keep the balance clean, dry and level. Avoid drafts, vibration and static charge. Never exceed the maximum load.',
+    role:'First quantitative step of media preparation, directly determining nutrient concentration in the finished medium.'
+  });
+  z.add(balance);
+
+  // weighing boats near balance
+  for(let i=0;i<3;i++){
+    const boatMat = new THREE.MeshStandardMaterial({color:0xf0f0f0, roughness:0.6, side:THREE.DoubleSide});
+    const boat = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.015,0.09), boatMat);
+    boat.position.set(-2.6+i*0.12, 1.0, 1.15);
+    z.add(boat);
+  }
+
+  // magnetic stirrer / hot plate with beaker
+  const stirrer = new THREE.Group();
+  const sBase = box(0.32,0.08,0.32, MAT.steelDark); sBase.position.y=0.98; stirrer.add(sBase);
+  const sTop = cyl(0.15,0.15,0.015, new THREE.MeshStandardMaterial({color:0x111417}),24); sTop.position.y=1.03; stirrer.add(sTop);
+  const sKnob1 = cyl(0.02,0.02,0.03, MAT.plastic,10); sKnob1.position.set(-0.12,1.03,0.14); stirrer.add(sKnob1);
+  const sKnob2 = sKnob1.clone(); sKnob2.position.x=0.12; stirrer.add(sKnob2);
+  const stirBeaker = makeBeaker(0.12,0.22); stirBeaker.position.set(0,1.04,0); stirrer.add(stirBeaker);
+  stirrer.position.set(-1.0,0,0.9);
+  registerInteractive(stirrer, {
+    id:'stirrer', zone:'Zone 2 — Media Preparation', name:'Magnetic Stirrer / Hot Plate',
+    overview:'A combined stirring and heating plate that dissolves media components evenly in distilled water.',
+    principle:'A rotating magnetic field spins a small stir bar inside the vessel while a resistive element heats the plate surface.',
+    func:'Ensures homogeneous dissolution of salts, vitamins and sucrose before pH adjustment.',
+    safety:'Allow the plate to cool before cleaning. Do not leave heating unattended; secure glassware to prevent spills.',
+    role:'Prepares a uniform nutrient solution that will next be pH-adjusted and dispensed into culture vessels.'
+  });
+  z.add(stirrer);
+
+  // pH meter with electrode
+  const ph = new THREE.Group();
+  const phBody = box(0.22,0.14,0.16, MAT.plasticWhite); phBody.position.y=1.04; ph.add(phBody);
+  const phDisplay = box(0.16,0.06,0.01, MAT.screen); phDisplay.position.set(0,1.07,0.085); ph.add(phDisplay);
+  const phArm = cyl(0.012,0.012,0.35, MAT.steel,8); phArm.position.set(0.14,1.2,0); ph.add(phArm);
+  const electrodeHolder = box(0.02,0.06,0.02, MAT.steelDark); electrodeHolder.position.set(0.14,1.38,0.06); ph.add(electrodeHolder);
+  const electrode = cyl(0.01,0.012,0.22, MAT.glass,10); electrode.position.set(0.14,1.24,0.06); ph.add(electrode);
+  const electrodeTip = cyl(0.012,0.006,0.02, new THREE.MeshStandardMaterial({color:0x2a2a2a})); electrodeTip.position.set(0.14,1.11,0.06); ph.add(electrodeTip);
+  ph.position.set(0.1,0,0.85);
+  registerInteractive(ph, {
+    id:'ph-meter', zone:'Zone 2 — Media Preparation', name:'pH Meter',
+    overview:'A benchtop meter with a glass combination electrode used to measure and adjust medium pH, typically to 5.7–5.8.',
+    principle:'The glass electrode generates a voltage proportional to hydrogen ion activity in the solution, converted to a pH reading.',
+    func:'Guides addition of dilute acid or base until the medium reaches the target pH before autoclaving.',
+    safety:'Rinse the electrode with distilled water between uses; store the tip in storage solution, never dry.',
+    role:'Correct pH is essential for nutrient availability, gel setting and healthy tissue growth — checked before sterilization.'
+  });
+  z.add(ph);
+
+  // reagent bottle rack
+  const rack = grp(1.7,0,0.6);
+  const rackBoard = box(1.6,0.4,0.35, MAT.cabinetDark); rackBoard.position.y=1.05; rack.add(rackBoard);
+  const colors=[0x2f6fa8,0x4a8f4a,0xb0762f,0x8a3f8a];
+  colors.forEach((c,i)=>{
+    const bottle = makeGlassBottle(0.06,0.22, new THREE.MeshPhysicalMaterial({color:c, transparent:true, opacity:0.8, roughness:0.15}));
+    bottle.position.set(-0.55+i*0.35,1.26,0);
+    rack.add(bottle);
+    const cap = makeLabel('R'+(i+1),0.14,0.08,'#fff','#111',48);
+    cap.position.set(-0.55+i*0.35,1.35,0.065);
+    rack.add(cap);
+  });
+  registerInteractive(rack, {
+    id:'reagents', zone:'Zone 2 — Media Preparation', name:'Reagent & Stock Solution Bottles',
+    overview:'Amber and clear bottles holding macronutrient, micronutrient, vitamin and hormone stock solutions.',
+    principle:'Concentrated stocks are stored and combined in small, precise volumes to build the final medium formulation.',
+    func:'Provide the mineral salts, vitamins and plant growth regulators required for a specific culture medium recipe (e.g. MS medium).',
+    safety:'Label every bottle with contents, concentration and date. Store hormone stocks refrigerated and away from light.',
+    role:'Supplies the chemical building blocks that the balance and stirrer combine into a usable culture medium.'
+  });
+  z.add(rack);
+
+  // distilled water container
+  const dw = makeGlassBottle(0.18,0.55, MAT.bottleClear);
+  dw.position.set(3.2,1.0,0.6);
+  registerInteractive(dw, {
+    id:'dwater', zone:'Zone 2 — Media Preparation', name:'Distilled / Deionized Water Container',
+    overview:'A large carboy of purified water used as the solvent base for all culture media.',
+    principle:'Distillation or deionization removes ions and organic contaminants that could interfere with tissue growth.',
+    func:'Diluent for dissolving nutrient salts and adjusting final medium volume.',
+    safety:'Keep the container capped when not dispensing to avoid airborne contamination.',
+    role:'Forms the bulk volume of every nutrient medium prepared in this zone.'
+  });
+  z.add(dw);
+
+  // media storage bottles on a shelf behind bench
+  const shelf = grp(0,0,-0.6);
+  const shelfBoard = box(6.6,0.05,0.3, MAT.cabinetDark); shelfBoard.position.y=2.0; shelf.add(shelfBoard);
+  for(let i=0;i<8;i++){
+    const bottle = makeGlassBottle(0.075,0.16, MAT.media);
+    bottle.position.set(-2.9+i*0.8,2.03,0);
+    shelf.add(bottle);
+  }
+  z.add(shelf);
+
+  // measuring cylinders
+  for(let i=0;i<2;i++){
+    const cylG = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,0.28,14,1,true), MAT.glass);
+    body.position.y=0.14;
+    cylG.add(body);
+    const liquid = cyl(0.038,0.045,0.1, MAT.media,14); liquid.position.y=0.06; cylG.add(liquid);
+    const base = cyl(0.06,0.06,0.02, MAT.glass,14); cylG.add(base);
+    cylG.position.set(1.9+i*0.18,1.0,1.2);
+    z.add(cylG);
+  }
+
+  const sign = makeSign('MEDIA PREPARATION','Weighing · Dissolution · pH Adjustment',1.6,1.0,'#1f6f4a');
+  sign.position.set(0,2.4,-1.45);
+  z.add(sign);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 3 — STERILIZATION (x ~ -6..2, z ~ -2..6)
+--------------------------------------------------------------------------------------- */
+function buildZone_Sterilization(){
+  const z = grp(-2, 0, 1);
+  scene.add(z);
+
+  const autoclave = new THREE.Group();
+  const body = cyl(0.75,0.75,1.5, MAT.steel, 24);
+  body.rotation.z = Math.PI/2;
+  body.position.y = 1.25;
+  autoclave.add(body);
+  const standL = box(0.1,1.1,0.7, MAT.steelDark); standL.position.set(-0.5,0.55,0); autoclave.add(standL);
+  const standR = standL.clone(); standR.position.x = 0.5; autoclave.add(standR);
+  const doorRing = cyl(0.72,0.72,0.08, MAT.steelDark, 24);
+  doorRing.rotation.z = Math.PI/2;
+  doorRing.position.set(0.78,1.25,0);
+  autoclave.add(doorRing);
+  const doorGlass = cyl(0.6,0.6,0.02, new THREE.MeshStandardMaterial({color:0x384850, metalness:0.6, roughness:0.4}), 24);
+  doorGlass.rotation.z = Math.PI/2;
+  doorGlass.position.set(0.83,1.25,0);
+  autoclave.add(doorGlass);
+  const wheel = new THREE.Group();
+  for(let i=0;i<6;i++){
+    const spoke = box(0.16,0.02,0.02, MAT.steelDark);
+    spoke.rotation.x = (i/6)*Math.PI*2;
+    wheel.add(spoke);
+  }
+  wheel.rotation.z = Math.PI/2;
+  wheel.position.set(0.9,1.25,0);
+  autoclave.add(wheel);
+
+  // control panel
+  const panel = box(0.5,0.6,0.06, MAT.cabinetDark);
+  panel.position.set(-0.85,1.55,0.55);
+  autoclave.add(panel);
+  const gauge = cyl(0.09,0.09,0.02, MAT.plasticWhite, 20);
+  gauge.rotation.x = Math.PI/2;
+  gauge.position.set(-0.85,1.72,0.585);
+  autoclave.add(gauge);
+  const gaugeNeedle = box(0.07,0.006,0.006, MAT.red);
+  gaugeNeedle.position.set(-0.86,1.72,0.6);
+  gaugeNeedle.rotation.z = 0.6;
+  autoclave.add(gaugeNeedle);
+  const tempDisplay = box(0.32,0.1,0.01, MAT.screen);
+  tempDisplay.position.set(-0.85,1.56,0.585);
+  autoclave.add(tempDisplay);
+  const indicatorLight = new THREE.Mesh(new THREE.SphereGeometry(0.02,10,10), MAT.ledAmber);
+  indicatorLight.position.set(-0.7,1.4,0.585);
+  autoclave.add(indicatorLight);
+  autoclave.userData.indicatorLight = indicatorLight;
+
+  // loading rack beside autoclave with sterile media containers
+  const rack = grp(1.9,0,0.9);
+  const rackFrame = box(0.9,1.0,0.5, MAT.steelDark);
+  rackFrame.position.y=0.5;
+  rackFrame.material = new THREE.MeshStandardMaterial({color:0x8b96a0, metalness:0.6, roughness:0.4, wireframe:false});
+  rack.add(rackFrame);
+  for(let i=0;i<4;i++){
+    const bottle = makeGlassBottle(0.08,0.18, MAT.media);
+    bottle.position.set(-0.32+ (i%2)*0.3, 1.02, -0.1+Math.floor(i/2)*0.2);
+    rack.add(bottle);
+  }
+  z.add(rack);
+
+  autoclave.position.set(-1.3,0,0.4);
+  registerInteractive(autoclave, {
+    id:'autoclave', zone:'Zone 3 — Sterilization', name:'Autoclave (Steam Steriliser)',
+    overview:'A pressure vessel that sterilises prepared media, glassware and instruments using saturated steam under pressure.',
+    principle:'Steam under pressure raises the chamber temperature above the boiling point of water, destroying microorganisms including resistant spores within a set holding time.',
+    func:'Renders culture media and tools sterile before they enter the aseptic transfer area, preventing contamination of plant cultures.',
+    safety:'Never open the door while the chamber is pressurised. Allow full depressurisation and cooling first. Use heat-resistant gloves when unloading. Only trained personnel should operate the unit.',
+    role:'The essential sterilization step of the tissue-culture workflow, positioned between media preparation and aseptic inoculation.'
+  });
+  z.add(autoclave);
+
+  const sign = makeSign('STERILIZATION','Do Not Open While Pressurized',1.6,1.0,'#b3282d');
+  sign.position.set(0,2.4,-1.3);
+  z.add(sign);
+
+  registerObstacle(z, -2, 1.4, 2.2, 1.4);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 4 — ASEPTIC TRANSFER / LAMINAR AIR FLOW (x ~ 4..12, z ~ -2..6)
+--------------------------------------------------------------------------------------- */
+let airflowArrows = [];
+let airflowActive = false;
+function buildZone_LAF(){
+  const z = grp(8, 0, 1.2);
+  scene.add(z);
+
+  const cab = new THREE.Group();
+  // main body
+  const bodyBase = box(2.6,0.9,1.2, MAT.cabinet);
+  bodyBase.position.y=0.85;
+  cab.add(bodyBase);
+  // HEPA filter housing on top
+  const hepa = box(2.4,0.5,1.1, MAT.cabinetDark);
+  hepa.position.y = 1.55;
+  cab.add(hepa);
+  const hepaVent = box(2.2,0.06,0.9, new THREE.MeshStandardMaterial({color:0xdfe3e5, roughness:0.5}));
+  hepaVent.position.set(0,1.3,0);
+  cab.add(hepaVent);
+  // side walls
+  const sideL = box(0.06,1.2,1.1, MAT.cabinetDark);
+  sideL.position.set(-1.27,1.6,0);
+  cab.add(sideL);
+  const sideR = sideL.clone(); sideR.position.x=1.27; cab.add(sideR);
+  // transparent front sash
+  const sash = box(2.5,0.85,0.03, MAT.glass);
+  sash.position.set(0,1.75,0.55);
+  cab.add(sash);
+  const sashFrame = box(2.55,0.06,0.05, MAT.steelDark);
+  sashFrame.position.set(0,2.18,0.55);
+  cab.add(sashFrame);
+  // work surface
+  const worksurf = box(2.4,0.05,1.0, MAT.steel);
+  worksurf.position.set(0,1.32,0);
+  cab.add(worksurf);
+  // UV/control panel
+  const uvPanel = box(0.6,0.18,0.04, MAT.cabinetDark);
+  uvPanel.position.set(1.0,1.95,0.56);
+  cab.add(uvPanel);
+  const uvLight = new THREE.Mesh(new THREE.SphereGeometry(0.02,10,10), MAT.ledGreen);
+  uvLight.position.set(0.85,1.95,0.58);
+  cab.add(uvLight);
+  const uvLabel = makeLabel('UV / AIRFLOW', 0.5,0.12,'#111','#fff',30);
+  uvLabel.position.set(1.05,2.05,0.58);
+  cab.add(uvLabel);
+
+  // tube racks + petri dishes + forceps + scalpel + alcohol bottle + culture vessels + explants
+  const tubeRack = grp(-0.8,0,0);
+  const rackBase = box(0.5,0.08,0.3, MAT.steelDark); rackBase.position.y=1.36; tubeRack.add(rackBase);
+  for(let i=0;i<4;i++){
+    const tube = makeTestTube(0.025,0.16);
+    tube.position.set(-0.18+i*0.12,1.4,0);
+    tubeRack.add(tube);
+  }
+  cab.add(tubeRack);
+
+  const petri1 = makePetriDish(0.09); petri1.position.set(-0.1,1.35,0.15); cab.add(petri1);
+  const petri2 = makePetriDish(0.09); petri2.position.set(0.15,1.35,0.15); cab.add(petri2);
+
+  const forceps = new THREE.Group();
+  const f1 = box(0.01,0.01,0.22, MAT.steel); f1.position.set(0.005,1.36,-0.15); forceps.add(f1);
+  const f2 = f1.clone(); f2.position.x=-0.005; forceps.add(f2);
+  cab.add(forceps);
+
+  const scalpel = new THREE.Group();
+  const handle = cyl(0.006,0.006,0.14, MAT.steelDark,8); handle.rotation.z=Math.PI/2; handle.position.set(0.35,1.36,-0.1); scalpel.add(handle);
+  const blade = box(0.05,0.01,0.002, MAT.steel); blade.position.set(0.44,1.36,-0.1); scalpel.add(blade);
+  cab.add(scalpel);
+
+  const alcohol = makeGlassBottle(0.05,0.14, new THREE.MeshPhysicalMaterial({color:0xdcefe0,transparent:true,opacity:0.5}));
+  alcohol.position.set(0.55,1.35,0.1);
+  cab.add(alcohol);
+
+  const cultureVessel = new THREE.Group();
+  const cvBody = cyl(0.05,0.05,0.13, MAT.glass,14); cvBody.position.y=1.4; cultureVessel.add(cvBody);
+  const cvLid = cyl(0.052,0.052,0.02, new THREE.MeshStandardMaterial({color:0x8c3f6e, transparent:true, opacity:0.85}),14);
+  cvLid.position.y=1.47; cultureVessel.add(cvLid);
+  const plant = makeMiniPlant(2.2); plant.position.y=1.42; cultureVessel.add(plant);
+  cultureVessel.position.set(-0.3,0,0.2);
+  cab.add(cultureVessel);
+
+  registerInteractive(cab, {
+    id:'laf-cabinet', zone:'Zone 4 — Aseptic Transfer', name:'Laminar Air Flow Cabinet',
+    overview:'An enclosed workstation that supplies a continuous stream of HEPA-filtered, particle-free air across the work surface for aseptic manipulation of plant tissue.',
+    principle:'Air is drawn through a HEPA filter that removes airborne particles and microorganisms, then delivered as a uniform laminar stream over the work area, preventing settling of contaminants onto open cultures.',
+    func:'Provides a sterile micro-environment for excising explants, subculturing and transferring tissue between vessels.',
+    safety:'Allow the fan to run and UV cycle to complete before use. Keep the sash at the working height marked, avoid rapid arm movement, and never block the front air intake.',
+    role:'The central working zone of the tissue-culture workflow, where sterilized media, tools and plant material are combined under aseptic conditions.'
+  });
+  z.add(cab);
+
+  // airflow arrows (hidden until toggled)
+  for(let i=0;i<4;i++){
+    const arrowMat = new THREE.MeshBasicMaterial({color:0x2fd4c0, transparent:true, opacity:0});
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.18,8), arrowMat);
+    arrow.rotation.x = Math.PI;
+    arrow.position.set(-0.9+i*0.6, 1.5, 0);
+    cab.add(arrow);
+    airflowArrows.push(arrow);
+  }
+  const airflowLabel = makeLabel('HEPA FILTERED AIR → ASEPTIC WORK AREA', 2.2,0.3,'#0e2330','#4fe0c9',26);
+  airflowLabel.position.set(0,2.3,0.2);
+  airflowLabel.visible = false;
+  cab.add(airflowLabel);
+  cab.userData.airflowLabel = airflowLabel;
+
+  const airflowBtnAnchor = box(0.35,0.14,0.03, MAT.accent2 || new THREE.MeshStandardMaterial({color:0x2fd4c0}));
+  airflowBtnAnchor.position.set(-1.0,1.95,0.56);
+  cab.add(airflowBtnAnchor);
+  const airflowBtnLabel = makeLabel('AIRFLOW', 0.32,0.12,'#0e2330','#4fe0c9',30);
+  airflowBtnLabel.position.set(-1.0,1.95,0.58);
+  cab.add(airflowBtnLabel);
+  registerInteractive(airflowBtnAnchor, {
+    id:'laf-airflow-btn', zone:'Zone 4 — Aseptic Transfer', name:'AIRFLOW Indicator Control',
+    overview:'Activates a visual demonstration of the conceptual airflow path through the laminar flow cabinet.',
+    principle:'Illustrates unidirectional HEPA-filtered air moving from the filter housing down and across the work surface.',
+    func:'Click to toggle the animated airflow visualization.',
+    safety:'For demonstration only — always confirm real equipment airflow using the manufacturer indicator before actual use.',
+    role:'Helps learners visualise how aseptic conditions are physically maintained during inoculation.'
+  });
+  cab.userData.isAirflowButton = true;
+  z.add(cab);
+
+  const sign = makeSign('ASEPTIC TRANSFER','Sterile Technique Zone',1.6,1.0,'#1f6f4a');
+  sign.position.set(0,2.6,-1.3);
+  z.add(sign);
+
+  registerObstacle(z, 8, 1.2, 1.6, 1.0);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 5 — CULTURE ROOM (x ~ 15..23, z ~ 0..10)
+--------------------------------------------------------------------------------------- */
+function buildZone_CultureRoom(){
+  const z = grp(19, 0, 5);
+  scene.add(z);
+
+  const rackPositions = [[-2.2,-1.5],[0,-1.5],[2.2,-1.5],[-2.2,1.5],[0,1.5],[2.2,1.5]];
+  let vesselCount = 0;
+  rackPositions.forEach((pos,ri)=>{
+    const rack = grp(pos[0],0,pos[1]);
+    const frameMat = MAT.steelDark;
+    for(let lvl=0;lvl<3;lvl++){
+      const shelf = box(1.5,0.04,0.5, frameMat);
+      shelf.position.set(0,0.7+lvl*0.65,0);
+      rack.add(shelf);
+      // LED strip under shelf
+      const ledStrip = box(1.4,0.015,0.03, MAT.led);
+      ledStrip.position.set(0,0.68+lvl*0.65,0.24);
+      rack.add(ledStrip);
+      // vessels on shelf
+      for(let v=0;v<4;v++){
+        const vesselType = (ri+lvl+v)%2;
+        let vessel;
+        if(vesselType===0){
+          vessel = new THREE.Group();
+          const vb = cyl(0.045,0.045,0.11, MAT.glass,12); vb.position.y=0.06; vessel.add(vb);
+          const vl = cyl(0.047,0.047,0.02, new THREE.MeshStandardMaterial({color:0xb0447f,transparent:true,opacity:0.9}),12);
+          vl.position.y=0.125; vessel.add(vl);
+          const plant = makeMiniPlant(2.4); plant.position.y=0.09; vessel.add(plant);
+        } else {
+          vessel = makeTestTube(0.022,0.14,false);
+          const plant = makeMiniPlant(1.6); plant.position.y=0.1; vessel.add(plant);
+        }
+        vessel.position.set(-0.55+v*0.37, 0.72+lvl*0.65, 0);
+        vessel.userData.cultureData = {
+          cultureId: 'CV-' + String(100+vesselCount),
+          stage: ['Initiation','Multiplication','Rooting','Acclimatization'][vesselCount%4],
+          medium: 'MS Medium + BAP 1.0 mg/L',
+          light: '16h light / 8h dark, ~3000 lux',
+          temp: '25 ± 2°C',
+          observation: ['Healthy green shoots, no contamination','Active shoot multiplication observed','Root initiation visible at base','Vigorous growth, ready for subculture'][vesselCount%4]
+        };
+        registerInteractive(vessel, {
+          id:'vessel-'+vesselCount, zone:'Zone 5 — Culture Room', name:'Culture Vessel — ' + vessel.userData.cultureData.cultureId,
+          overview:'A sealed culture vessel containing an in-vitro plantlet growing on solidified nutrient medium under controlled light and temperature.',
+          principle:'Totipotent plant cells develop into complete plantlets when supplied with balanced nutrients, sugars and growth regulators in a sterile, controlled environment.',
+          func:'Houses a single culture line through a defined growth stage until ready for subculture or transfer.',
+          safety:'Inspect through the vessel wall only — do not open outside the laminar flow cabinet.',
+          role:'Represents the incubation stage of the tissue culture workflow, following aseptic inoculation.',
+          cultureData: vessel.userData.cultureData
+        });
+        rack.add(vessel);
+        vesselCount++;
+      }
+    }
+    z.add(rack);
+    registerObstacle(z, pos[0], pos[1], 0.85, 0.35);
+  });
+
+  // environmental control panel
+  const panel = new THREE.Group();
+  const pBody = box(0.7,0.55,0.06, MAT.cabinetDark);
+  pBody.position.y=1.9;
+  panel.add(pBody);
+  const pDisplay = box(0.58,0.16,0.01, MAT.screen);
+  pDisplay.position.set(0,2.05,0.035);
+  panel.add(pDisplay);
+  const pDisplay2 = box(0.58,0.16,0.01, MAT.screen);
+  pDisplay2.position.set(0,1.86,0.035);
+  panel.add(pDisplay2);
+  const pLabel = makeLabel('TEMP 25°C   RH 55%', 0.56,0.14,'#0d2f2a','#1fdfc4',26);
+  pLabel.position.set(0,2.05,0.04);
+  panel.add(pLabel);
+  const pLabel2 = makeLabel('PHOTOPERIOD 16:8', 0.56,0.14,'#0d2f2a','#1fdfc4',26);
+  pLabel2.position.set(0,1.86,0.04);
+  panel.add(pLabel2);
+  panel.position.set(0,0,-2.1);
+  registerInteractive(panel, {
+    id:'culture-env-panel', zone:'Zone 5 — Culture Room', name:'Environmental Control Panel',
+    overview:'Monitors and displays temperature, relative humidity and photoperiod inside the culture room.',
+    principle:'Sensors feed a controller that regulates HVAC and LED lighting to keep conditions within the optimal range for plant growth.',
+    func:'Maintains a stable 25 ± 2°C, controlled humidity and a 16-hour light / 8-hour dark photoperiod for cultured plantlets.',
+    safety:'Do not adjust setpoints without protocol authorization; large swings can stress or contaminate cultures.',
+    role:'Sustains the controlled environment required throughout the incubation stage of the workflow.'
+  });
+  z.add(panel);
+
+  const sign = makeSign('CULTURE ROOM','Controlled Environment Incubation',1.6,1.0,'#1f6f4a');
+  sign.position.set(0,2.8,-2.35);
+  z.add(sign);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 6 — OBSERVATION AREA (x ~ 15..23, z ~ -12..-4)
+--------------------------------------------------------------------------------------- */
+function buildZone_Observation(){
+  const z = grp(19, 0, -9);
+  scene.add(z);
+  const bench = makeBench(4.4,1.4);
+  bench.position.set(0,0,0.5);
+  z.add(bench);
+  registerObstacle(z,19,-8.5,2.4,0.8);
+
+  // compound microscope
+  const scope = new THREE.Group();
+  const base = box(0.28,0.05,0.4, MAT.steelDark); base.position.y=1.0; scope.add(base);
+  const arm = box(0.06,0.5,0.08, MAT.steelDark); arm.position.set(-0.08,1.25,-0.1); arm.rotation.z=0.15; scope.add(arm);
+  const stage = box(0.2,0.02,0.16, MAT.steel); stage.position.set(0,1.15,0.02); scope.add(stage);
+  const tube = cyl(0.03,0.03,0.28, MAT.steelDark,14); tube.rotation.z = 0.35; tube.position.set(0.02,1.55,-0.12); scope.add(tube);
+  const eyepiece = cyl(0.025,0.02,0.08, MAT.plastic,14); eyepiece.rotation.z=0.35; eyepiece.position.set(-0.08,1.68,-0.2); scope.add(eyepiece);
+  const objective = cyl(0.02,0.025,0.09, MAT.steelDark,14); objective.position.set(0.03,1.38,0.02); scope.add(objective);
+  const lightSrc = new THREE.Mesh(new THREE.SphereGeometry(0.015,10,10), MAT.led); lightSrc.position.set(0,1.02,0.02); scope.add(lightSrc);
+  scope.position.set(-1.3,0,0.6);
+  registerInteractive(scope, {
+    id:'compound-microscope', zone:'Zone 6 — Observation', name:'Compound Microscope',
+    overview:'A high-magnification optical instrument used to examine cell structure and detect early contamination in culture samples.',
+    principle:'Light passes through a thin specimen and is magnified by a series of objective and eyepiece lenses.',
+    func:'Used to inspect callus tissue, cell morphology and stained sections at high magnification.',
+    safety:'Handle lenses only with lens tissue; carry with two hands supporting the base and arm.',
+    role:'Supports the observation stage of the workflow, confirming tissue health before further subculture.'
+  });
+  z.add(scope);
+
+  // stereo microscope
+  const stereo = new THREE.Group();
+  const sBase = box(0.24,0.05,0.24, MAT.steelDark); sBase.position.y=1.0; stereo.add(sBase);
+  const sArm = box(0.05,0.35,0.05, MAT.steelDark); sArm.position.set(0,1.2,-0.08); stereo.add(sArm);
+  const sHead = box(0.16,0.1,0.12, MAT.plastic); sHead.position.set(0,1.4,0); stereo.add(sHead);
+  const sEye1 = cyl(0.018,0.018,0.06, MAT.plastic,10); sEye1.rotation.x=0.3; sEye1.position.set(-0.045,1.47,0.04); stereo.add(sEye1);
+  const sEye2 = sEye1.clone(); sEye2.position.x=0.045; stereo.add(sEye2);
+  stereo.position.set(0.3,0,0.6);
+  registerInteractive(stereo, {
+    id:'stereo-microscope', zone:'Zone 6 — Observation', name:'Stereo Microscope',
+    overview:'A low-magnification, dual-eyepiece microscope offering a three-dimensional view of explants and small culture structures.',
+    principle:'Two separate optical paths converge to create a binocular, three-dimensional image at lower magnification than a compound scope.',
+    func:'Used for dissecting explants, examining shoot tips, and detailed visual inspection during aseptic transfer.',
+    safety:'Clean the stage between samples to avoid cross-contamination of specimens.',
+    role:'Assists precise handling of tissue at the aseptic transfer and observation stages.'
+  });
+  z.add(stereo);
+
+  // petri dish samples + forceps on bench
+  const p1 = makePetriDish(0.09); p1.position.set(1.2,1.0,0.6); z.add(p1);
+  const p2 = makePetriDish(0.09); p2.position.set(1.45,1.0,0.6); z.add(p2);
+
+  const sign = makeSign('OBSERVATION AREA','Microscopy & Sample Inspection',1.6,1.0,'#1f6f4a');
+  sign.position.set(0,2.4,-1.0);
+  z.add(sign);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 7 — COLD STORAGE (x ~ -2..6, z ~ -14..-8)
+--------------------------------------------------------------------------------------- */
+function buildZone_ColdStorage(){
+  const z = grp(2, 0, -11);
+  scene.add(z);
+
+  const fridge = new THREE.Group();
+  const fBody = box(1.1,2.0,0.8, MAT.fridgeBody);
+  fBody.position.y=1.0;
+  fridge.add(fBody);
+  const fDoor = box(1.0,1.85,0.05, new THREE.MeshStandardMaterial({color:0xe4e8e9, roughness:0.35, metalness:0.3}));
+  fDoor.position.set(0,1.0,0.42);
+  fridge.add(fDoor);
+  const fHandle = box(0.04,0.5,0.04, MAT.steelDark);
+  fHandle.position.set(0.42,1.1,0.46);
+  fridge.add(fHandle);
+  const fDisplay = box(0.3,0.08,0.01, MAT.screen);
+  fDisplay.position.set(0,1.75,0.46);
+  fridge.add(fDisplay);
+  const fLabel = makeLabel('4°C', 0.28,0.07,'#0d2f2a','#1fdfc4',30);
+  fLabel.position.set(0,1.75,0.465);
+  fridge.add(fLabel);
+  fridge.position.set(-1.6,0,0);
+  registerInteractive(fridge, {
+    id:'fridge', zone:'Zone 7 — Cold Storage', name:'Laboratory Refrigerator',
+    overview:'A dedicated refrigerator maintained at approximately 4°C for storing stock solutions, hormones and short-term culture material.',
+    principle:'Low temperature slows chemical degradation and microbial growth, extending reagent shelf life.',
+    func:'Stores vitamin stocks, hormone stocks and other temperature-sensitive reagents used in media preparation.',
+    safety:'Store chemicals and biological material in clearly separated, labelled containers; never store food inside.',
+    role:'Preserves reagent quality between media preparation sessions.'
+  }, true);
+  z.add(fridge);
+
+  const freezer = fridge.clone(true);
+  freezer.position.set(0.1,0,0);
+  freezer.children[3].material = MAT.screen;
+  registerInteractive(freezer, {
+    id:'freezer', zone:'Zone 7 — Cold Storage', name:'Laboratory Freezer (−20°C)',
+    overview:'A low-temperature freezer used for long-term storage of enzymes, DNA/RNA extracts and select hormone stocks.',
+    principle:'Sub-zero storage arrests enzymatic activity and microbial growth for long-term reagent stability.',
+    func:'Stores freeze-sensitive reagents that would degrade at refrigerator temperature.',
+    safety:'Wear insulated gloves when retrieving samples for extended periods. Keep an inventory log.',
+    role:'Supports long-term reagent readiness for the media preparation zone.'
+  }, true);
+  z.add(freezer);
+
+  // reagent shelves with labelled containers
+  const shelf = grp(1.9,0,0);
+  for(let lvl=0;lvl<3;lvl++){
+    const shelfBoard = box(1.0,0.04,0.4, MAT.cabinetDark);
+    shelfBoard.position.set(0,0.8+lvl*0.55,0);
+    shelf.add(shelfBoard);
+    for(let i=0;i<3;i++){
+      const container = box(0.16,0.2,0.16, new THREE.MeshStandardMaterial({color:0xeef0f0, roughness:0.5}));
+      container.position.set(-0.32+i*0.32, 0.9+lvl*0.55, 0);
+      const lbl = makeLabel('R'+(lvl*3+i+1), 0.12,0.06,'#b3282d','#fff',40);
+      lbl.position.set(-0.32+i*0.32, 0.94+lvl*0.55, 0.085);
+      shelf.add(container);
+      shelf.add(lbl);
+    }
+  }
+  registerInteractive(shelf, {
+    id:'cold-shelves', zone:'Zone 7 — Cold Storage', name:'Labelled Reagent Shelving',
+    overview:'Open shelving holding clearly labelled reagent containers organized by category and expiry.',
+    principle:'Consistent labelling and segregation prevent mix-ups and support traceability of chemicals used in media preparation.',
+    func:'Organized storage of buffers, salts and auxiliary reagents not requiring refrigeration.',
+    safety:'Never store incompatible chemicals together; check expiry dates regularly.',
+    role:'Keeps the media preparation workflow supplied with correctly identified reagents.'
+  }, true);
+  z.add(shelf);
+
+  const sign = makeSign('COLD STORAGE','4°C Refrigeration · −20°C Freezer',1.6,1.0,'#1f6f4a');
+  sign.position.set(0.2,2.4,-1.2);
+  z.add(sign);
+  registerObstacle(z,2,-11,2.2,0.7);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 9 — DARK ROOM / STORAGE (x ~ 12..22, z ~ -24..-12)
+--------------------------------------------------------------------------------------- */
+function buildZone_DarkStorage(){
+  const z = grp(17, 0, -17);
+  scene.add(z);
+
+  const roomFloor = box(9.6, 0.08, 9.8, new THREE.MeshStandardMaterial({color:0xe7ebed, roughness:0.85}));
+  roomFloor.position.set(0, 0.04, 0);
+  z.add(roomFloor);
+
+  const wallMat = MAT.wallDark;
+  const northWall = box(9.5, 3.3, 0.2, wallMat); northWall.position.set(0, 1.65, -4.9); z.add(northWall);
+  const southLeft = box(3.4, 3.3, 0.2, new THREE.MeshStandardMaterial({color:0x2f3d44, transparent:true, opacity:0.42, roughness:0.6})); southLeft.position.set(-3.05, 1.65, 4.9); z.add(southLeft);
+  const southRight = box(3.4, 3.3, 0.2, new THREE.MeshStandardMaterial({color:0x2f3d44, transparent:true, opacity:0.42, roughness:0.6})); southRight.position.set(3.05, 1.65, 4.9); z.add(southRight);
+  const westWall = box(0.2, 3.3, 9.5, wallMat); westWall.position.set(-4.75, 1.65, 0); z.add(westWall);
+  const eastWall = box(0.2, 3.3, 9.5, wallMat); eastWall.position.set(4.75, 1.65, 0); z.add(eastWall);
+
+  const doorHeader = box(2.2, 0.75, 0.18, new THREE.MeshStandardMaterial({color:0x3d4c5a, transparent:true, opacity:0.5})); doorHeader.position.set(0, 2.75, 4.9); z.add(doorHeader);
+  const door = box(1.7, 2.5, 0.08, new THREE.MeshStandardMaterial({color:0x4f6475, transparent:true, opacity:0.45, roughness:0.45, metalness:0.25}));
+  door.position.set(0, 1.34, 4.86); z.add(door);
+  const doorHandle = box(0.06, 0.08, 0.04, MAT.steelDark); doorHandle.position.set(0.52, 1.38, 4.95); z.add(doorHandle);
+
+  const dimCeiling = box(9.6, 0.08, 9.8, new THREE.MeshStandardMaterial({color:0xdee7ec, transparent:true, opacity:0.35, roughness:0.9}));
+  dimCeiling.position.set(0, 3.28, 0); z.add(dimCeiling);
+  const darkLight = new THREE.PointLight(0x8ea4c0, 0.18, 12, 2); darkLight.position.set(0, 2.7, 0); z.add(darkLight);
+  const lowGlow = box(1.3, 0.04, 1.3, new THREE.MeshBasicMaterial({color:0x8fa8be, transparent:true, opacity:0.18}));
+  lowGlow.position.set(0, 3.15, 0); z.add(lowGlow);
+
+  const sign = makeSign('DARK ROOM / STORAGE','Light-sensitive materials · Sterile supplies · Consumables',2.3,1.1,'#1f6f4a');
+  sign.position.set(0, 2.65, 3.7); z.add(sign);
+
+  function makeDarkRack(w=1.7, d=0.45, h=2.1){
+    const rack = new THREE.Group();
+    const frame = new THREE.MeshStandardMaterial({color:0x8b949d, roughness:0.48, metalness:0.7});
+    const left = box(0.06, h, d, frame); left.position.set(-w/2, h/2, 0); rack.add(left);
+    const right = box(0.06, h, d, frame); right.position.set(w/2, h/2, 0); rack.add(right);
+    const back = box(w, h, 0.04, frame); back.position.set(0, h/2, -d/2); rack.add(back);
+    for(let i=0;i<4;i++){
+      const shelf = box(w-0.12, 0.04, d-0.08, MAT.cabinetDark); shelf.position.set(0, 0.52 + i*0.45, 0); rack.add(shelf);
+      for(let j=-1;j<=1;j+=2){
+        const boxMesh = box(0.22, 0.18, 0.18, new THREE.MeshStandardMaterial({color:0xf1f3f4, roughness:0.6}));
+        boxMesh.position.set(j*0.45, 0.62 + i*0.45, 0.08); rack.add(boxMesh);
+        const boxLabel = makeLabel((i===0&&j<0?'SEED':i===1&&j<0?'MEDIA':i===2&&j<0?'GLASS':'SUPPL'), 0.24, 0.08, '#0d2f2a','#dffaf5',26);
+        boxLabel.position.set(j*0.45, 0.62 + i*0.45, 0.17); rack.add(boxLabel);
+      }
+    }
+    return rack;
+  }
+
+  const rackA = makeDarkRack(1.9, 0.5, 2.1); rackA.position.set(-2.1, 0, -0.8); z.add(rackA);
+  registerInteractive(rackA, {
+    id:'dark-rack-sterile-supplies', zone:'Zone 9 — Dark Room / Storage', name:'Dark Room Storage Rack',
+    overview:'A dedicated metal rack for protected storage of light-sensitive culture supplies, sterile containers and temperature-sensitive materials.',
+    principle:'Low-light storage minimizes photodegradation of light-sensitive compounds and preserves reagent integrity.',
+    func:'Stores culture vessels, sterile packaging, sealed containers and supply stocks away from direct illumination.',
+    safety:'Keep containers labelled and closed; segregate incompatible chemicals and check expiry dates before use.',
+    role:'Protects sensitive materials and maintains organized access to sterile consumables during tissue culture work.'
+  }, true);
+
+  const rackB = makeDarkRack(1.9, 0.5, 2.1); rackB.position.set(2.2, 0, -0.8); z.add(rackB);
+  registerInteractive(rackB, {
+    id:'dark-rack-chemicals', zone:'Zone 9 — Dark Room / Storage', name:'Chemical and Reagent Storage Rack',
+    overview:'A labelled rack for reagent bottles and storage boxes protected from ambient light and contamination.',
+    principle:'Proper segregation, closure and light control preserve the stability of chemicals, vitamins and growth regulators.',
+    func:'Holds bottles, stock solutions, reagent boxes and sealed consumables used across media preparation and culture routines.',
+    safety:'Store acid, base and oxidizer classes separately; keep lids closed and keep a clean, dry storage surface at all times.',
+    role:'Ensures reagents remain stable, traceable and ready for safe use in the laboratory workflow.'
+  }, true);
+
+  function makeCabinet(w=1.2,h=2.0,d=0.7){
+    const g = new THREE.Group();
+    const body = box(w,h,d, MAT.cabinetDark); body.position.y = h/2; g.add(body);
+    const doorL = box(w*0.45, h-0.18, 0.04, MAT.plasticWhite); doorL.position.set(-w*0.2, h/2, d/2+0.02); g.add(doorL);
+    const doorR = box(w*0.45, h-0.18, 0.04, MAT.plasticWhite); doorR.position.set(w*0.2, h/2, d/2+0.02); g.add(doorR);
+    const handleL = box(0.04,0.08,0.03, MAT.steelDark); handleL.position.set(-w*0.18, h*0.53, d/2+0.05); g.add(handleL);
+    const handleR = box(0.04,0.08,0.03, MAT.steelDark); handleR.position.set(w*0.18, h*0.53, d/2+0.05); g.add(handleR);
+    return g;
+  }
+
+  const cabinetA = makeCabinet(1.4, 2.2, 0.7); cabinetA.position.set(-3.3, 0, 2.2); z.add(cabinetA);
+  registerInteractive(cabinetA, {
+    id:'dark-room-cabinet-1', zone:'Zone 9 — Dark Room / Storage', name:'Closed Storage Cabinet',
+    overview:'A lockable cabinet used to protect sterile supplies, labelled containers and light-sensitive materials from dust and unwanted exposure.',
+    principle:'Closed storage reduces contamination risk and helps maintain light-sensitive materials under consistent conditions.',
+    func:'Stores sterile packaging, glassware, consumables and special-use materials requiring protected storage.',
+    safety:'Keep the cabinet clean, dry and organized; label each shelf or box clearly; never store incompatible chemicals together.',
+    role:'Preserves the integrity and readiness of laboratory materials between preparation and use.'
+  }, true);
+
+  const cabinetB = makeCabinet(1.4, 2.2, 0.7); cabinetB.position.set(3.2, 0, 2.2); z.add(cabinetB);
+  registerInteractive(cabinetB, {
+    id:'dark-room-cabinet-2', zone:'Zone 9 — Dark Room / Storage', name:'Consumables and Glassware Cabinet',
+    overview:'A second enclosed unit for glassware, sterile packaging and consumables that must remain clean, protected and traceable.',
+    principle:'Proper segregation of clean inventory reduces handling errors and contamination during preparation or transfer operations.',
+    func:'Stores flasks, bottles, pipettes, wrappers and other clean or sterile supplies used across the lab.',
+    safety:'Store only clean, dry materials here; verify container integrity and review expiry dates before distribution.',
+    role:'Supports a ready, ordered supply of clean consumables throughout plant tissue culture workflows.'
+  }, true);
+
+  const counter = makeBench(2.9, 0.7); counter.position.set(0, 0, 2.7); z.add(counter);
+  const counterPanel = box(2.9,0.7,0.04, new THREE.MeshStandardMaterial({color:0xf5f7f8, roughness:0.5})); counterPanel.position.set(0, 1.4, 0.38); z.add(counterPanel);
+  const counterLabel = makeLabel('STORAGE COUNTER', 0.8, 0.18, '#0d2f2a', '#dffaf5', 28); counterLabel.position.set(0, 1.35, 0.42); z.add(counterLabel);
+  registerInteractive(counter, {
+    id:'dark-room-counter', zone:'Zone 9 — Dark Room / Storage', name:'Dark Room Work and Storage Counter',
+    overview:'A compact work surface used for temporary staging, ordering and handling of protected storage items before transfer to active work zones.',
+    principle:'A dedicated counter reduces unnecessary movement through the lab and keeps light-sensitive items organized within the dark room.',
+    func:'Supports sorting, packaging and preparation of materials while maintaining controlled storage conditions.',
+    safety:'Keep the counter dry and uncluttered; label all containers; ensure only approved materials remain in the dark-room area.',
+    role:'Facilitates organized handling and efficient retrieval of protected culture supplies.'
+  }, true);
+
+  const binA = box(0.28, 0.26, 0.28, new THREE.MeshStandardMaterial({color:0xdfe9ed, roughness:0.5})); binA.position.set(-4.1, 0.13, -3.2); z.add(binA);
+  const labBinLabel = makeLabel('BOXES', 0.38, 0.1, '#0d2f2a','#dffaf5',26); labBinLabel.position.set(-4.1, 0.33, -2.95); z.add(labBinLabel);
+  registerInteractive(binA, {
+    id:'dark-room-boxes', zone:'Zone 9 — Dark Room / Storage', name:'Labelled Storage Boxes',
+    overview:'Stacked boxes are used to keep sterile, reagent and culture supplies clearly grouped by type and use.',
+    principle:'Uniform, labelled packaging supports traceability and prevents confusion among materials used in the clean-work areas.',
+    func:'Holds stock boxes, culture accessories and consumables that require orderly organization.',
+    safety:'Keep labels clear and legible; store boxes on firm, dry shelving and inspect for moisture or damage.',
+    role:'Maintains a tidy, efficient inventory system for support materials and consumables.'
+  }, true);
+
+  registerObstacle(z, 17, -21.9, 4.8, 0.15);
+  registerObstacle(z, 13.9, -12.1, 1.7, 0.15);
+  registerObstacle(z, 20.1, -12.1, 1.7, 0.15);
+  registerObstacle(z, 12.2, -17, 0.15, 4.7);
+  registerObstacle(z, 21.8, -17, 0.15, 4.7);
+
+  registerObstacle(rackA, 14.9, -17.8, 1.0, 0.5);
+  registerObstacle(rackB, 19.4, -17.8, 1.0, 0.5);
+  registerObstacle(cabinetA, 13.7, -14.8, 0.75, 0.45);
+  registerObstacle(cabinetB, 20.2, -14.8, 0.75, 0.45);
+  registerObstacle(counter, 17, -14.3, 1.6, 0.5);
+  registerObstacle(binA, 12.9, -20.2, 0.25, 0.25);
+}
+
+/* ---------------------------------------------------------------------------------------
+   ZONE 8 — WASTE MANAGEMENT (x ~ -16..-8, z ~ -14..-8)
+--------------------------------------------------------------------------------------- */
+function buildZone_Waste(){
+  const z = grp(-12, 0, -11);
+  scene.add(z);
+
+  const bins = [
+    {label:'BIOHAZARD', color:0xe5484d, x:-2.1, desc:'Biological Waste Container', info:{
+      overview:'A red, biohazard-labelled container for disposal of contaminated culture material, spent media and plant tissue waste.',
+      principle:'Segregated collection allows biological waste to be autoclaved or incinerated separately from general refuse, preventing spread of contamination.',
+      func:'Receives discarded cultures, contaminated vessels and plant material removed during subculture.',
+      safety:'Never place sharps in this bin. Autoclave contents before final disposal per institutional protocol.',
+      role:'Closes the workflow loop by safely removing spent biological material generated during culture handling.'
+    }},
+    {label:'SHARPS', color:0xf5a623, x:-0.7, desc:'Sharps Container', info:{
+      overview:'A rigid, puncture-resistant container for used scalpel blades and other sharp instruments.',
+      principle:'A sealed, puncture-proof design prevents accidental needle-stick or cut injuries during disposal.',
+      func:'Collects disposable blades and sharp tools used during aseptic dissection and transfer.',
+      safety:'Never overfill past the fill line; never attempt to retrieve items once deposited.',
+      role:'Protects laboratory personnel from injury while supporting proper instrument disposal after aseptic work.'
+    }},
+    {label:'GENERAL', color:0x8a97a0, x:0.7, desc:'General Laboratory Waste', info:{
+      overview:'Standard waste bin for non-hazardous, non-biological laboratory refuse such as packaging and paper.',
+      principle:'Segregating non-hazardous waste from biological and chemical waste streams reduces disposal cost and risk.',
+      func:'Receives clean packaging, paper towels and other non-contaminated disposables.',
+      safety:'Do not place any contaminated or chemical material in this bin.',
+      role:'Supports overall laboratory housekeeping and correct waste segregation.'
+    }},
+    {label:'CHEMICAL', color:0x8a3f8a, x:2.1, desc:'Chemical Waste Container', info:{
+      overview:'A dedicated container for spent chemical reagents, expired stock solutions and cleaning agents.',
+      principle:'Chemically incompatible wastes are segregated to prevent hazardous reactions and to allow proper licensed disposal.',
+      func:'Collects excess or expired reagents from media preparation for safe disposal.',
+      safety:'Never mix incompatible chemicals; consult the safety data sheet before disposal; keep tightly sealed.',
+      role:'Ensures chemical by-products of media preparation are removed from the laboratory safely.'
+    }},
+  ];
+  bins.forEach(b=>{
+    const bin = new THREE.Group();
+    const body = cyl(0.28,0.24,0.55, new THREE.MeshStandardMaterial({color:b.color, roughness:0.5}), 16);
+    body.position.y=0.3;
+    bin.add(body);
+    const lid = cyl(0.3,0.3,0.06, new THREE.MeshStandardMaterial({color:b.color, roughness:0.4}), 16);
+    lid.position.y=0.6;
+    bin.add(lid);
+    const lbl = makeLabel(b.label, 0.5,0.16,'#111','#fff',36);
+    lbl.position.set(0,0.35,0.245);
+    bin.add(lbl);
+    bin.position.set(b.x,0,0.4);
+    registerInteractive(bin, {
+      id:'bin-'+b.label, zone:'Zone 8 — Waste Management', name:b.desc,
+      overview:b.info.overview, principle:b.info.principle, func:b.info.func,
+      safety:b.info.safety, role:b.info.role
+    }, true);
+    z.add(bin);
+  });
+
+  const panel = box(1.4,1.0,0.05, new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.6}));
+  panel.position.set(0,1.7,-0.3);
+  z.add(panel);
+  const panelText = makeSign('WASTE SEGREGATION','Biohazard · Sharps · General · Chemical — never mix streams',1.3,0.85,'#1f6f4a');
+  panelText.position.set(0,1.7,-0.27);
+  z.add(panelText);
+
+  registerObstacle(z,-12,-10.8,2.6,0.6);
+}
+
+/* ---------------------------------------------------------------------------------------
+   SAFETY EQUIPMENT (distributed around the room)
+--------------------------------------------------------------------------------------- */
+function buildSafetyEquipment(){
+  // Emergency shower (near entry, x -6, z 12)
+  const shower = new THREE.Group();
+  const pole = cyl(0.03,0.03,2.6, MAT.steelDark,10); pole.position.y=1.3; shower.add(pole);
+  const head = cyl(0.16,0.16,0.06, MAT.steelDark,16); head.position.y=2.55; shower.add(head);
+  const pullRod = box(0.02,0.5,0.02, MAT.ledRed); pullRod.position.y=2.0; shower.add(pullRod);
+  const handle = box(0.1,0.02,0.02, MAT.plastic); handle.position.y=1.75; shower.add(handle);
+  shower.position.set(-6,0,12.6);
+  registerInteractive(shower, {
+    id:'shower', zone:'Safety Systems', name:'Emergency Shower',
+    overview:'A wall/ceiling-mounted deluge shower for immediate full-body decontamination in case of chemical exposure.',
+    principle:'A large volume of water rapidly dilutes and washes hazardous chemicals from skin and clothing.',
+    func:'Activated by pulling the overhead handle; delivers continuous water flow for at least fifteen minutes of flushing.',
+    safety:'Know the shower location before starting work. Remove contaminated clothing while flushing. Seek medical attention after use.',
+    role:'Critical emergency response equipment supporting overall laboratory chemical safety.'
+  }, true);
+  scene.add(shower);
+  registerObstacle(null,-6,12.6,0.3,0.3);
+
+  // Eyewash station near shower
+  const eyewash = new THREE.Group();
+  const stand = cyl(0.03,0.03,0.9, MAT.steelDark,10); stand.position.y=0.45; eyewash.add(stand);
+  const bowl = cyl(0.14,0.1,0.1, MAT.plasticWhite,16); bowl.position.y=0.95; eyewash.add(bowl);
+  const nozzle1 = cyl(0.015,0.015,0.05, MAT.steel,10); nozzle1.position.set(-0.05,1.02,0); eyewash.add(nozzle1);
+  const nozzle2 = nozzle1.clone(); nozzle2.position.x=0.05; eyewash.add(nozzle2);
+  eyewash.position.set(-4.6,0,12.6);
+  registerInteractive(eyewash, {
+    id:'eyewash', zone:'Safety Systems', name:'Eyewash Station',
+    overview:'A basin with twin nozzles for immediate flushing of the eyes following chemical or biological splash exposure.',
+    principle:'A gentle, continuous stream of clean water flushes contaminants away from the eye surface.',
+    func:'Activated by a push handle or foot pedal to deliver simultaneous flow to both eyes.',
+    safety:'Flush for at least fifteen minutes; hold eyelids open; seek medical evaluation afterward.',
+    role:'Provides immediate first-response protection for the eyes during laboratory work.'
+  }, true);
+  scene.add(eyewash);
+  registerObstacle(null,-4.6,12.6,0.25,0.25);
+
+  // Fire extinguisher (near sterilization zone wall)
+  const ext = new THREE.Group();
+  const tank = cyl(0.09,0.11,0.5, new THREE.MeshStandardMaterial({color:0xc21f26, roughness:0.4, metalness:0.3}),16);
+  tank.position.y=0.55; ext.add(tank);
+  const cap = cyl(0.05,0.06,0.06, MAT.steelDark,16); cap.position.y=0.83; ext.add(cap);
+  const hose = torusHose(); hose.position.set(0.08,0.7,0); ext.add(hose);
+  const bracket = box(0.14,0.02,0.06, MAT.steelDark); bracket.position.y=0.32; ext.add(bracket);
+  ext.position.set(-2,0,-5.2);
+  registerInteractive(ext, {
+    id:'extinguisher', zone:'Safety Systems', name:'Fire Extinguisher',
+    overview:'A portable CO2 or dry-chemical extinguisher positioned near heat-generating equipment such as the autoclave and hot plate.',
+    principle:'Extinguishing agent smothers the fire by removing oxygen or interrupting the combustion reaction.',
+    func:'Used for small, incipient fires only, following the Pull-Aim-Squeeze-Sweep technique.',
+    safety:'Only attempt to fight a fire you are trained for and that is small and contained; otherwise evacuate and alert others.',
+    role:'Core fire-safety equipment supporting the laboratory emergency response plan.'
+  }, true);
+  scene.add(ext);
+  registerObstacle(null,-2,-5.2,0.2,0.2);
+
+  // Fire alarm (wall mounted near LAF zone)
+  const alarm = new THREE.Group();
+  const box1 = box(0.16,0.16,0.06, MAT.signRed); box1.position.y=0; alarm.add(box1);
+  const alarmLight = new THREE.Mesh(new THREE.SphereGeometry(0.015,8,8), MAT.ledRed); alarmLight.position.set(0,0.06,0.035); alarm.add(alarmLight);
+  alarm.position.set(11.8,2.4,-5.7);
+  registerInteractive(alarm, {
+    id:'fire-alarm', zone:'Safety Systems', name:'Fire Alarm Pull Station',
+    overview:'A manually activated alarm that alerts building occupants to evacuate in an emergency.',
+    principle:'Pulling the lever completes an electrical circuit that triggers audible and visual alarms throughout the building.',
+    func:'Activated immediately upon discovering fire, smoke, or another life-safety emergency.',
+    safety:'After activation, evacuate immediately via the nearest marked exit; do not use elevators.',
+    role:'Coordinates rapid, building-wide emergency response.'
+  }, true);
+  scene.add(alarm);
+
+  // Emergency exit sign (above door)
+  const exitSign = makeSign('EXIT','', 1.0,0.4,'#1f6f4a');
+  exitSign.position.set(0, ROOM.h-0.5, ROOM.d/2-0.05);
+  registerInteractive(exitSign, {
+    id:'exit-sign', zone:'Safety Systems', name:'Illuminated Emergency Exit Sign',
+    overview:'A continuously illuminated sign marking the nearest safe evacuation route from the laboratory.',
+    principle:'High-visibility green signage with backup power ensures the exit route remains identifiable even during a power failure.',
+    func:'Guides occupants toward the exit door during an evacuation.',
+    safety:'Keep the path beneath and around exit signage clear of obstruction at all times.',
+    role:'Ensures a fast, safe evacuation route is always visible from anywhere in the laboratory.'
+  }, true);
+  scene.add(exitSign);
+
+  // First aid kit
+  const firstAid = new THREE.Group();
+  const cab = box(0.3,0.35,0.12, new THREE.MeshStandardMaterial({color:0xf3f3f3, roughness:0.5})); firstAid.add(cab);
+  const cross1 = box(0.16,0.04,0.005, MAT.ledRed); cross1.position.z=0.065; firstAid.add(cross1);
+  const cross2 = box(0.04,0.16,0.005, MAT.ledRed); cross2.position.z=0.065; firstAid.add(cross2);
+  firstAid.position.set(15.5,1.6,-13.6);
+  registerInteractive(firstAid, {
+    id:'first-aid', zone:'Safety Systems', name:'First Aid Cabinet',
+    overview:'A wall-mounted cabinet stocked with bandages, antiseptic and basic supplies for treating minor injuries.',
+    principle:'Prompt treatment of minor cuts, burns or splashes reduces the risk of infection and further injury.',
+    func:'Provides immediate supplies for treating minor laboratory injuries before further medical care if needed.',
+    safety:'Restock used items promptly; for serious injuries, seek professional medical attention immediately.',
+    role:'Supports rapid first-response care as part of the overall laboratory safety system.'
+  }, true);
+  scene.add(firstAid);
+
+  // Emergency contact board
+  const board = box(1.0,0.8,0.04, new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.6}));
+  board.position.set(-19,1.9,13.6);
+  const boardText = makeSign('EMERGENCY CONTACTS','Lab Supervisor · Safety Officer · Campus Security · Emergency Services',0.95,0.72,'#1f6f4a');
+  boardText.position.set(-19,1.9,13.58);
+  registerInteractive(boardText, {
+    id:'contact-board', zone:'Safety Systems', name:'Emergency Contact Board',
+    overview:'A wall-mounted board listing key emergency contacts for the laboratory and institution.',
+    principle:'Rapid access to the correct contact reduces response time during an incident.',
+    func:'Lists laboratory supervisor, safety officer, campus security and emergency services numbers.',
+    safety:'Keep contact information current; verify numbers periodically.',
+    role:'Ensures personnel can summon appropriate help quickly during any laboratory emergency.'
+  }, true);
+  scene.add(board); scene.add(boardText);
+
+  // biohazard/chemical storage safety labels near cold storage already covered by shelf item.
+}
+function torusHose(){
+  const g = new THREE.Group();
+  const t = new THREE.Mesh(new THREE.TorusGeometry(0.07,0.012,8,16,Math.PI*1.3), new THREE.MeshStandardMaterial({color:0x1a1a1a}));
+  t.rotation.x = Math.PI/2;
+  g.add(t);
+  return g;
+}
+
+/* ---------------------------------------------------------------------------------------
+   RAYCASTER — HOVER + CLICK
+--------------------------------------------------------------------------------------- */
+let currentHighlightOriginal = new Map();
+function onPointerMove(e){
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  updateHover(e.clientX, e.clientY);
+}
+function onTouchMove(e){
+  if(e.touches.length===0) return;
+  const t = e.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((t.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((t.clientY-rect.top)/rect.height)*2+1;
+}
+function updateHover(clientX, clientY){
+  if(fpMode){ document.getElementById('tooltip').style.display='none'; return; }
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactiveObjects, true);
+  const tooltip = document.getElementById('tooltip');
+  if(hits.length>0){
+    let obj = hits[0].object;
+    while(obj.parent && !obj.userData.isInteractive) obj = obj.parent;
+    if(obj !== hovered){
+      clearHighlight();
+      hovered = obj;
+      applyHighlight(obj);
+    }
+    renderer.domElement.style.cursor = 'pointer';
+    tooltip.style.display = 'block';
+    tooltip.style.left = clientX+'px';
+    tooltip.style.top = clientY+'px';
+  } else {
+    clearHighlight();
+    hovered = null;
+    renderer.domElement.style.cursor = 'default';
+    tooltip.style.display = 'none';
+  }
+}
+function applyHighlight(obj){
+  obj.traverse(o=>{
+    if(o.isMesh && o.material && o.material.emissive){
+      currentHighlightOriginal.set(o, {color: o.material.emissive.getHex(), intensity: o.material.emissiveIntensity});
+      o.material.emissive.setHex(0x2fd4c0);
+      o.material.emissiveIntensity = Math.max(o.material.emissiveIntensity, 0.35);
+    }
+  });
+}
+function clearHighlight(){
+  currentHighlightOriginal.forEach((val,mesh)=>{
+    mesh.material.emissive.setHex(val.color);
+    mesh.material.emissiveIntensity = val.intensity;
+  });
+  currentHighlightOriginal.clear();
+}
+function onClick(){
+  if(fpMode) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactiveObjects, true);
+  if(hits.length>0){
+    let obj = hits[0].object;
+    while(obj.parent && !obj.userData.isInteractive) obj = obj.parent;
+    if(obj.userData.isAirflowButton !== undefined && obj.userData.id === 'laf-airflow-btn'){
+      toggleAirflow();
+      return;
+    }
+    openInfoPanel(obj.userData);
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+   AIRFLOW ANIMATION
+--------------------------------------------------------------------------------------- */
+function toggleAirflow(){
+  airflowActive = !airflowActive;
+  airflowArrows.forEach(a=>{ a.userData.animTime = 0; });
+  const lafCab = interactiveObjects.find(o=>o.userData.id==='laf-cabinet');
+  if(lafCab && lafCab.userData.airflowLabel) lafCab.userData.airflowLabel.visible = airflowActive;
+}
+
+/* ---------------------------------------------------------------------------------------
+   INFO PANEL
+--------------------------------------------------------------------------------------- */
+function openInfoPanel(data){
+  document.getElementById('ip-zone').textContent = data.zone || 'LABORATORY';
+  document.getElementById('ip-title').textContent = data.name || 'Equipment';
+  document.getElementById('ip-overview').innerHTML = buildOverviewHTML(data);
+  document.getElementById('ip-principle').innerHTML = `<p>${data.principle||'—'}</p>`;
+  document.getElementById('ip-function').innerHTML = `<p>${data.func||'—'}</p>`;
+  document.getElementById('ip-safety').innerHTML = `<p>${data.safety||'—'}</p>`;
+  document.getElementById('ip-role').innerHTML = `<p>${data.role||'—'}</p>`;
+  document.getElementById('info-panel').classList.add('open');
+  document.querySelectorAll('.ip-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.ip-tab[data-tab="overview"]').classList.add('active');
+  document.querySelectorAll('.ip-section').forEach(s=>s.classList.remove('active'));
+  document.querySelector('.ip-section[data-tab="overview"]').classList.add('active');
+}
+function buildOverviewHTML(data){
+  let html = `<p>${data.overview||''}</p>`;
+  if(data.cultureData){
+    const c = data.cultureData;
+    html += `<div style="margin-top:16px;">
+      <span class="ip-badge">CULTURE RECORD</span>
+      <ul class="ip-list">
+        <li><b>ID:</b> ${c.cultureId}</li>
+        <li><b>Stage:</b> ${c.stage}</li>
+        <li><b>Medium:</b> ${c.medium}</li>
+        <li><b>Light:</b> ${c.light}</li>
+        <li><b>Temperature:</b> ${c.temp}</li>
+        <li><b>Observation:</b> ${c.observation}</li>
+      </ul></div>`;
+  }
+  return html;
+}
+document.getElementById('ip-close').addEventListener('click', ()=>{
+  document.getElementById('info-panel').classList.remove('open');
+});
+document.querySelectorAll('.ip-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.ip-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.ip-section').forEach(s=>s.classList.remove('active'));
+    document.querySelector(`.ip-section[data-tab="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+/* ---------------------------------------------------------------------------------------
+   GUIDED TOUR
+--------------------------------------------------------------------------------------- */
+const tourStops = [
+  { title:'PPE Station', desc:'Every visitor dons a lab coat, gloves, mask, goggles and shoe covers before proceeding — the first line of contamination control.', pos:[-19,4.2,12.8], look:[-19,1.7,9.5] },
+  { title:'Media Preparation', desc:'Nutrient salts, sugars and growth regulators are weighed and dissolved into a base medium at this bench.', pos:[-12,4.5,7], look:[-12,1.2,2] },
+  { title:'pH Meter', desc:'The medium pH is adjusted to roughly 5.7–5.8 before it is dispensed and sterilized.', pos:[-9.5,3.2,4], look:[-11.9,1.2,2.85] },
+  { title:'Autoclave', desc:'Prepared media and tools are sterilized under high-pressure steam, destroying microorganisms before aseptic work.', pos:[-2,4,6], look:[-3.3,1.3,1.4] },
+  { title:'Laminar Airflow Cabinet', desc:'HEPA-filtered air maintains a sterile field where explants are excised and transferred.', pos:[8,4,6], look:[8,1.6,1.2] },
+  { title:'Inoculation Area', desc:'Inside the cabinet, forceps and scalpels transfer surface-sterilized explants onto fresh medium.', pos:[9.5,3,3], look:[8.3,1.4,1.2] },
+  { title:'Culture Room', desc:'Inoculated vessels incubate here under controlled light, temperature and humidity until ready for the next stage.', pos:[19,4.5,11], look:[19,1.4,5] },
+  { title:'Microscope', desc:'Compound and stereo microscopes let researchers examine tissue structure and detect early contamination.', pos:[18,3,-6], look:[18.7,1.4,-8.4] },
+  { title:'Refrigerator', desc:'Hormone and vitamin stocks are kept at 4°C to preserve their activity between preparations.', pos:[2,3.5,-6.5], look:[0.4,1,-11] },
+  { title:'Dark Room / Storage', desc:'Light-sensitive reagents, sterile containers and laboratory consumables are stored here in a controlled dark environment.', pos:[12.8,4.2,-9.6], look:[17,1.6,-16.4] },
+  { title:'Waste Management', desc:'Biological, sharps, general and chemical waste are strictly segregated into separate, labelled containers.', pos:[-12,3.5,-6.5], look:[-12,1,-10.6] },
+  { title:'Emergency Safety Equipment', desc:'Emergency shower, eyewash, fire extinguisher, alarm and exit signage keep the laboratory prepared for any incident.', pos:[-8,4,15], look:[-5.3,1.5,12.6] },
+];
+let tourIndex = 0;
+let tourActive = false;
+let cameraTween = null;
+
+function startTour(){
+  tourActive = true;
+  orbit.enabled = false;
+  tourIndex = 0;
+  document.getElementById('tour-panel').classList.add('open');
+  buildTourDots();
+  goToTourStop(0);
+}
+function exitTour(){
+  tourActive = false;
+  orbit.enabled = true;
+  document.getElementById('tour-panel').classList.remove('open');
+}
+function buildTourDots(){
+  const wrap = document.getElementById('tour-progress');
+  wrap.innerHTML='';
+  tourStops.forEach((s,i)=>{
+    const d = document.createElement('div');
+    d.className = 'tour-dot' + (i===tourIndex?' active':'');
+    wrap.appendChild(d);
+  });
+}
+function goToTourStop(i){
+  tourIndex = Math.max(0, Math.min(tourStops.length-1, i));
+  const stop = tourStops[tourIndex];
+  document.getElementById('tour-step-label').textContent = `STOP ${tourIndex+1} OF ${tourStops.length}`;
+  document.getElementById('tour-title').textContent = stop.title;
+  document.getElementById('tour-desc').textContent = stop.desc;
+  buildTourDots();
+  tweenCameraTo(stop.pos, stop.look, 1.4);
+}
+document.getElementById('tour-next').addEventListener('click', ()=> goToTourStop(tourIndex+1<tourStops.length?tourIndex+1:tourIndex));
+document.getElementById('tour-prev').addEventListener('click', ()=> goToTourStop(tourIndex-1>=0?tourIndex-1:0));
+document.getElementById('tour-exit').addEventListener('click', exitTour);
+
+function tweenCameraTo(pos, look, duration=1.2){
+  const startPos = camera.position.clone();
+  const startTarget = orbit.target.clone();
+  const endPos = new THREE.Vector3(...pos);
+  const endTarget = new THREE.Vector3(...look);
+  const t0 = performance.now();
+  cameraTween = { startPos, startTarget, endPos, endTarget, t0, duration:duration*1000 };
+}
+function updateCameraTween(){
+  if(!cameraTween) return;
+  const t = Math.min(1, (performance.now()-cameraTween.t0)/cameraTween.duration);
+  const ease = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+  camera.position.lerpVectors(cameraTween.startPos, cameraTween.endPos, ease);
+  orbit.target.lerpVectors(cameraTween.startTarget, cameraTween.endTarget, ease);
+  if(t>=1) cameraTween = null;
+}
+
+/* ---------------------------------------------------------------------------------------
+   SAFETY MODE
+--------------------------------------------------------------------------------------- */
+let safetyModeOn = false;
+const safetyChecklistItems = [
+  'PPE available','Emergency exit accessible','Eyewash accessible','Safety shower accessible',
+  'Fire extinguisher available','Waste segregation available','Sharps container available','First-aid kit available'
+];
+function toggleSafetyMode(){
+  safetyModeOn = !safetyModeOn;
+  document.getElementById('btn-safety').classList.toggle('active', safetyModeOn);
+  document.getElementById('safety-panel').classList.toggle('open', safetyModeOn);
+  if(safetyModeOn){
+    const list = document.getElementById('safety-checklist');
+    list.innerHTML = safetyChecklistItems.map(i=>`<div class="sp-item"><div class="sp-check">✓</div>${i}</div>`).join('');
+  }
+  safetyObjects.forEach(obj=>{
+    obj.traverse(o=>{
+      if(o.isMesh && o.material && o.material.emissive){
+        if(safetyModeOn){
+          o.userData._safetyOrigEmissive = o.material.emissive.getHex();
+          o.userData._safetyOrigIntensity = o.material.emissiveIntensity;
+          o.material.emissive.setHex(0xf5a623);
+          o.material.emissiveIntensity = 0.55;
+        } else if(o.userData._safetyOrigEmissive !== undefined){
+          o.material.emissive.setHex(o.userData._safetyOrigEmissive);
+          o.material.emissiveIntensity = o.userData._safetyOrigIntensity;
+        }
+      }
+    });
+  });
+}
+
+/* ---------------------------------------------------------------------------------------
+   WORKFLOW PANEL
+--------------------------------------------------------------------------------------- */
+const workflowSteps = [
+  { title:'EXPLANT SELECTION', desc:'Healthy donor plant tissue (shoot tip, node, leaf) is selected as the starting material.', pos:[-19,4.5,15.5], look:[-19,1.8,10] },
+  { title:'MEDIA PREPARATION', desc:'Nutrient salts, vitamins, sugar and growth regulators are weighed and dissolved.', pos:[-12,4.5,7], look:[-12,1.2,2] },
+  { title:'pH ADJUSTMENT', desc:'Medium pH is measured and adjusted to the target range before sterilization.', pos:[-9.5,3.2,4], look:[-11.9,1.2,2.85] },
+  { title:'STERILIZATION', desc:'Media, glassware and tools are autoclaved to eliminate microorganisms.', pos:[-2,4,6], look:[-3.3,1.3,1.4] },
+  { title:'ASEPTIC INOCULATION', desc:'Surface-sterilized explants are transferred onto sterile medium inside the laminar flow cabinet.', pos:[8,4,6], look:[8,1.6,1.2] },
+  { title:'INCUBATION', desc:'Inoculated vessels are placed in the culture room under controlled light and temperature.', pos:[19,4.5,11], look:[19,1.4,5] },
+  { title:'OBSERVATION', desc:'Cultures are periodically examined under the microscope for growth and contamination.', pos:[18,3,-6], look:[18.7,1.4,-8.4] },
+  { title:'DARK ROOM / STORAGE', desc:'Light-sensitive materials, sterile containers and reagents are stored here under dark, controlled conditions.', pos:[12.8,4.2,-9.6], look:[17,1.6,-16.4] },
+  { title:'SUBCULTURE / HARDENING', desc:'Healthy plantlets are subcultured onto fresh medium or hardened off for eventual transfer to soil.', pos:[19,4.5,3], look:[19,1.4,2] },
+];
+function buildWorkflowPanel(){
+  const wrap = document.getElementById('wf-steps');
+  wrap.innerHTML='';
+  workflowSteps.forEach((s,i)=>{
+    const el = document.createElement('div');
+    el.innerHTML = `<div class="wf-step"><div class="wf-num">${i+1}</div><div><div class="wf-step-title">${s.title}</div><div class="wf-step-desc">${s.desc}</div></div></div>` + (i<workflowSteps.length-1?'<div class="wf-arrow">↓</div>':'');
+    wrap.appendChild(el);
+    el.querySelector('.wf-step').addEventListener('click', ()=>{
+      closeWorkflow();
+      tweenCameraTo(s.pos, s.look, 1.3);
+    });
+  });
+}
+function openWorkflow(){ document.getElementById('workflow-overlay').classList.add('open'); }
+function closeWorkflow(){ document.getElementById('workflow-overlay').classList.remove('open'); }
+
+/* ---------------------------------------------------------------------------------------
+   FIRST PERSON MODE
+--------------------------------------------------------------------------------------- */
+let fpMode = false;
+const fpKeys = {w:false,a:false,s:false,d:false};
+let fpYaw = 0, fpPitch = 0;
+const fpPos = new THREE.Vector3(0,1.7,14);
+let pointerLocked = false;
+
+function getPointerLockDoc(){
+  return (renderer && renderer.domElement && renderer.domElement.ownerDocument) || document;
+}
+function requestPointerLockSafe(){
+  const el = renderer && renderer.domElement;
+  if(!el || typeof el.requestPointerLock !== 'function') return;
+  try {
+    const p = el.requestPointerLock();
+    if(p && typeof p.catch === 'function') {
+      p.catch(()=>{
+        pointerLocked = false;
+        clearMovementKeys();
+        if(fpMode){
+          fpMode = false;
+          orbit.enabled = true;
+        }
+      });
+    }
+  } catch (err) {
+    pointerLocked = false;
+    clearMovementKeys();
+    if(fpMode){
+      fpMode = false;
+      orbit.enabled = true;
+    }
+  }
+}
+function exitPointerLockSafe(){
+  try {
+    const lockDoc = getPointerLockDoc();
+    if(lockDoc && lockDoc.pointerLockElement === renderer.domElement && typeof lockDoc.exitPointerLock === 'function') {
+      const p = lockDoc.exitPointerLock();
+      if(p && typeof p.catch === 'function') p.catch(()=>{});
+    }
+  } catch (err) {}
+}
+function clearMovementKeys(){
+  fpKeys.w = false; fpKeys.a = false; fpKeys.s = false; fpKeys.d = false;
+}
+function enterFirstPerson(){
+  if(fpMode) return;
+  clearMovementKeys();
+  fpMode = true;
+  orbit.enabled = false;
+  fpPos.set(camera.position.x, 1.7, camera.position.z);
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  if(dir.lengthSq() < 1e-6) dir.set(0,0,-1);
+  fpYaw = Math.atan2(dir.x, dir.z);
+  fpPitch = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1));
+  camera.position.set(fpPos.x, fpPos.y, fpPos.z);
+  const look = new THREE.Vector3(
+    Math.sin(fpYaw) * Math.cos(fpPitch),
+    Math.sin(fpPitch),
+    Math.cos(fpYaw) * Math.cos(fpPitch)
+  );
+  camera.lookAt(camera.position.clone().add(look));
+  document.getElementById('crosshair').style.display='block';
+  document.getElementById('fp-hint').style.display = isTouch() ? 'none' : 'block';
+  document.getElementById('btn-fp').classList.add('active');
+  document.getElementById('btn-fp').textContent = 'Exit First-Person';
+  if(isTouch()){
+    document.getElementById('touch-controls').style.display='block';
+  } else {
+    requestPointerLockSafe();
+  }
+}
+function exitFirstPerson(){
+  clearMovementKeys();
+  if(!fpMode && !pointerLocked) return;
+  fpMode = false;
+  pointerLocked = false;
+  orbit.enabled = true;
+  document.getElementById('crosshair').style.display='none';
+  document.getElementById('fp-hint').style.display='none';
+  document.getElementById('touch-controls').style.display='none';
+  document.getElementById('btn-fp').classList.remove('active');
+  document.getElementById('btn-fp').textContent = 'First-Person';
+  exitPointerLockSafe();
+  orbit.target.set(camera.position.x, 2, camera.position.z);
+}
+function isTouch(){ return 'ontouchstart' in window || navigator.maxTouchPoints>0; }
+
+document.addEventListener('pointerlockchange', ()=>{
+  pointerLocked = document.pointerLockElement === renderer.domElement;
+  if(!pointerLocked && fpMode && !isTouch()){
+    clearMovementKeys();
+    exitFirstPerson();
+  }
+});
+document.addEventListener('pointerlockerror', ()=>{
+  pointerLocked = false;
+  clearMovementKeys();
+  if(fpMode) exitFirstPerson();
+});
+document.addEventListener('mousemove', (e)=>{
+  if(fpMode && pointerLocked){
+    fpYaw -= e.movementX * 0.0026;
+    fpPitch -= e.movementY * 0.0018;
+    fpPitch = Math.max(-1.2, Math.min(1.2, fpPitch));
+  }
+});
+window.addEventListener('keydown', (e)=>{
+  if(e.repeat) return;
+  const k = e.key.toLowerCase();
+  if(fpMode && (k==='w'||k==='a'||k==='s'||k==='d')){
+    e.preventDefault();
+    if(k==='w') fpKeys.w=true; if(k==='a') fpKeys.a=true; if(k==='s') fpKeys.s=true; if(k==='d') fpKeys.d=true;
+    return;
+  }
+  if(k==='escape' && fpMode){
+    e.preventDefault();
+    exitFirstPerson();
+  }
+});
+window.addEventListener('keyup', (e)=>{
+  const k = e.key.toLowerCase();
+  if(k==='w') fpKeys.w=false; if(k==='a') fpKeys.a=false; if(k==='s') fpKeys.s=false; if(k==='d') fpKeys.d=false;
+});
+window.addEventListener('blur', ()=>{
+  clearMovementKeys();
+  if(fpMode && !pointerLocked && !isTouch()) exitFirstPerson();
+});
+document.querySelectorAll('.touch-btn').forEach(btn=>{
+  const k = btn.dataset.k;
+  btn.addEventListener('touchstart', (e)=>{ e.preventDefault(); fpKeys[k]=true; });
+  btn.addEventListener('touchend', (e)=>{ e.preventDefault(); fpKeys[k]=false; });
+});
+// simple touch-drag look for mobile first-person
+let touchLookId = null, lastTouchX=0, lastTouchY=0;
+renderer_touch_setup();
+function renderer_touch_setup(){
+  window.addEventListener('touchstart', (e)=>{
+    if(!fpMode) return;
+    for(const t of e.touches){
+      if(t.clientX > window.innerWidth*0.35 && touchLookId===null){ touchLookId=t.identifier; lastTouchX=t.clientX; lastTouchY=t.clientY; }
+    }
+  }, {passive:true});
+  window.addEventListener('touchmove', (e)=>{
+    if(!fpMode) return;
+    for(const t of e.touches){
+      if(t.identifier===touchLookId){
+        fpYaw -= (t.clientX-lastTouchX)*0.004;
+        fpPitch -= (t.clientY-lastTouchY)*0.004;
+        fpPitch = Math.max(-1.2, Math.min(1.2, fpPitch));
+        lastTouchX=t.clientX; lastTouchY=t.clientY;
+      }
+    }
+  }, {passive:true});
+  window.addEventListener('touchend', (e)=>{
+    let stillThere=false;
+    for(const t of e.touches) if(t.identifier===touchLookId) stillThere=true;
+    if(!stillThere) touchLookId=null;
+  });
+}
+
+function updateFirstPerson(dt){
+  if(!fpMode) return;
+  const speed = 4.25 * dt;
+  const forward = new THREE.Vector3(Math.sin(fpYaw), 0, Math.cos(fpYaw));
+  const right = new THREE.Vector3(Math.cos(fpYaw), 0, -Math.sin(fpYaw));
+  const move = new THREE.Vector3();
+  if(fpKeys.w) move.add(forward);
+  if(fpKeys.s) move.sub(forward);
+  if(fpKeys.d) move.add(right);
+  if(fpKeys.a) move.sub(right);
+  if(move.lengthSq()>0){
+    move.normalize().multiplyScalar(speed);
+    const nextX = fpPos.clone();
+    nextX.x += move.x;
+    if(!collides(nextX.x, fpPos.z, 0.32)) fpPos.x = nextX.x;
+    const nextZ = fpPos.clone();
+    nextZ.z += move.z;
+    if(!collides(fpPos.x, nextZ.z, 0.32)) fpPos.z = nextZ.z;
+  }
+  fpPos.y = 1.7;
+  camera.position.set(fpPos.x, fpPos.y, fpPos.z);
+  const dir = new THREE.Vector3(
+    Math.sin(fpYaw) * Math.cos(fpPitch),
+    Math.sin(fpPitch),
+    Math.cos(fpYaw) * Math.cos(fpPitch)
+  );
+  camera.lookAt(camera.position.clone().add(dir));
+}
+function collides(x,z,radius=0.3){
+  for(const ob of obstacles){
+    const minx = ob.minx - radius;
+    const maxx = ob.maxx + radius;
+    const minz = ob.minz - radius;
+    const maxz = ob.maxz + radius;
+    if(x > minx && x < maxx && z > minz && z < maxz) return true;
+  }
+  return false;
+}
+
+/* ---------------------------------------------------------------------------------------
+   UI WIRING
+--------------------------------------------------------------------------------------- */
+function showLabUI(){
+  document.getElementById('topbar').classList.remove('hidden');
+  document.getElementById('bottombar').classList.remove('hidden');
+}
+document.getElementById('btn-enter-lab').addEventListener('click', ()=>{
+  document.getElementById('landing').classList.add('hidden');
+  showLabUI();
+});
+document.getElementById('btn-guided-tour-land').addEventListener('click', ()=>{
+  document.getElementById('landing').classList.add('hidden');
+  showLabUI();
+  startTour();
+});
+document.getElementById('btn-lab-safety-land').addEventListener('click', ()=>{
+  document.getElementById('landing').classList.add('hidden');
+  showLabUI();
+  toggleSafetyMode();
+});
+document.getElementById('btn-tour').addEventListener('click', ()=>{
+  if(tourActive) exitTour(); else startTour();
+});
+document.getElementById('btn-safety').addEventListener('click', toggleSafetyMode);
+document.getElementById('btn-workflow').addEventListener('click', openWorkflow);
+document.getElementById('wf-close').addEventListener('click', closeWorkflow);
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  if(fpMode) exitFirstPerson();
+  if(tourActive) exitTour();
+  tweenCameraTo([0,7.5,17],[0,2,0],1.0);
+});
+document.getElementById('btn-fp').addEventListener('click', ()=>{
+  if(fpMode) exitFirstPerson(); else enterFirstPerson();
+});
+
+/* ---------------------------------------------------------------------------------------
+   RESIZE + ANIMATE
+--------------------------------------------------------------------------------------- */
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if(fpMode){ updateFirstPerson(dt); }
+  else { updateCameraTween(); orbit.update(); }
+
+  // airflow arrow animation
+  if(airflowActive){
+    airflowArrows.forEach((a,i)=>{
+      a.userData.animTime = (a.userData.animTime||i*0.25) + dt*1.2;
+      const t = a.userData.animTime % 1.4;
+      a.position.y = 1.9 - t*0.75;
+      a.material.opacity = t<1.1 ? 0.85 : 0.85*(1.4-t)/0.3;
+    });
+  }
+
+  // autoclave indicator pulse
+  const t = performance.now()*0.001;
+  scene.traverse(o=>{
+    if(o.userData && o.userData.indicatorLight){
+      o.userData.indicatorLight.material.emissiveIntensity = 0.6+Math.sin(t*3)*0.4;
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+/* ---------------------------------------------------------------------------------------
+   BOOT
+--------------------------------------------------------------------------------------- */
+window.addEventListener('load', ()=>{
+  init();
+  buildWorkflowPanel();
+  setTimeout(()=>{
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('landing').classList.remove('hidden');
+  }, 700);
+  if(isTouch()){
+    // touch orbit already handled by OrbitControls; enable touch controls only in FP mode
+  }
+});
+</script>
+</body>
+</html>
